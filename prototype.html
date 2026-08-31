@@ -1,0 +1,829 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<title>中通冷链 · 订单管理（AI助理集成原型）</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;font-size:13px;color:#303133;background:#e8ebf0}
+.app{width:1280px;margin:0 auto;background:#fff;min-height:100vh;position:relative;box-shadow:0 0 0 1px #d8dde5}
+.topbar{height:48px;background:#00A6A6;color:#fff;display:flex;align-items:center;padding:0 18px;gap:26px}
+.brand{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:500;letter-spacing:.5px}
+.brand .lg{width:32px;height:32px;background:#fff;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#00A6A6;font-weight:700;font-size:15px}
+.topnav{display:flex;gap:26px;font-size:13px;align-items:center}
+.topnav span{cursor:pointer;opacity:.85;display:flex;align-items:center;gap:2px}
+.topnav span.act{opacity:1;font-weight:500}
+.topnav span::after{content:"";display:inline-block;border:4px solid transparent;border-top-color:rgba(255,255,255,.7);margin-left:2px;margin-top:4px}
+.topright{margin-left:auto;display:flex;gap:18px;font-size:12px;align-items:center}
+.topright span{cursor:pointer;opacity:.9;display:flex;align-items:center;gap:4px}
+.topright .dot{width:6px;height:6px;background:#F56C6C;border-radius:50%}
+.topright .bd{background:#F56C6C;color:#fff;border-radius:8px;padding:0 5px;font-size:10px;line-height:14px;margin-left:2px;font-weight:500}
+.layout{display:flex;height:calc(100vh - 48px)}
+.sidebar{width:200px;background:#1F2D40;color:#dde2eb;flex-shrink:0;display:flex;flex-direction:column}
+.sw{padding:14px 16px;border-bottom:0.5px solid #2c3a52;font-size:12px;display:flex;justify-content:space-between;align-items:center;background:#19243a}
+.sw b{color:#fff;font-weight:500;display:flex;align-items:center;gap:6px}
+.sw b::after{content:"";display:inline-block;border:4px solid transparent;border-top-color:#9099ad;margin-top:3px}
+.smenu{flex:1;overflow-y:auto;padding:8px 0}
+.si{display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;font-size:13px;border-left:3px solid transparent;color:#c2c8d3}
+.si:hover{background:#26334a;color:#fff}
+.si.act{background:#00A6A6;color:#fff;border-left-color:#fff}
+.si svg{flex-shrink:0;opacity:.85}
+.si.act svg{opacity:1}
+.sb{padding:14px 16px;border-top:0.5px solid #2c3a52;display:flex;justify-content:space-between;align-items:center;font-size:12px;background:#19243a}
+.tog{position:relative;width:32px;height:16px;background:#00A6A6;border-radius:8px;cursor:pointer}
+.tog::after{content:"";position:absolute;top:2px;left:18px;width:12px;height:12px;background:#fff;border-radius:50%}
+.main{flex:1;background:#F4F6F8;position:relative;overflow-y:auto;background-image:repeating-linear-gradient(135deg,#F4F6F8,#F4F6F8 14px,#EDF0F4 14px,#EDF0F4 15px)}
+.mp{padding:0 18px 18px}
+.subnav{background:#fff;border-bottom:0.5px solid #E4E7ED;padding:0 18px;display:flex;gap:24px;overflow-x:auto;height:40px;align-items:stretch;font-size:13px}
+.subnav span{cursor:pointer;display:flex;align-items:center;color:#606266;border-bottom:2px solid transparent;white-space:nowrap}
+.subnav span.act{color:#00A6A6;border-bottom-color:#00A6A6;font-weight:500}
+.erralert{margin-top:14px;background:#FFF7E6;border:0.5px solid #FFD591;border-radius:6px;padding:10px 14px;display:flex;align-items:center;gap:10px;font-size:13px;position:relative}
+.erralert .warn{color:#D46B08;font-weight:500;display:flex;align-items:center;gap:6px}
+.erralert p{margin:0;flex:1;color:#874D00}
+.erralert .btn{padding:4px 14px;border-radius:4px;border:0.5px solid #00A6A6;background:#fff;color:#00A6A6;cursor:pointer;font-size:12px;font-family:inherit}
+.erralert .btn:hover{background:#E6F8F8}
+.erralert .btn.pri{background:#00A6A6;color:#fff;border-color:#00A6A6}
+.erralert .btn.pri:hover{background:#008C8C}
+.erralert .x{position:absolute;top:6px;right:8px;cursor:pointer;color:#bbb;font-size:14px;background:none;border:none}
+.tkbox{margin-top:12px;background:#fff;border:0.5px solid #E4E7ED;border-radius:6px;padding:8px 14px;font-size:12px;display:none}
+.tkbox.on{display:block}
+.tkbox h4{margin:0 0 8px;font-weight:500;display:flex;justify-content:space-between;align-items:center}
+.tkbox h4 span{color:#909399;font-weight:400}
+.tkbox .ti{padding:6px 0;border-top:0.5px solid #F0F2F5;display:flex;gap:10px;align-items:flex-start}
+.tkbox .ti:first-of-type{border-top:none}
+.tkbox .id{color:#00A6A6;font-weight:500;flex-shrink:0;width:140px}
+.tkbox .src{background:#E6F8F8;color:#00A6A6;padding:1px 6px;border-radius:3px;font-size:11px;flex-shrink:0}
+.tkbox .ds{flex:1;color:#606266;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tabs{margin-top:12px;display:flex;background:#fff;border-bottom:0.5px solid #E4E7ED;padding:0 18px;font-size:13px}
+.tabs span{padding:12px 18px;cursor:pointer;color:#606266;border-bottom:2px solid transparent;display:flex;align-items:center;gap:4px}
+.tabs span.act{color:#00A6A6;border-bottom-color:#00A6A6;font-weight:500}
+.tabs .bd{background:#F56C6C;color:#fff;border-radius:8px;padding:0 5px;font-size:10px;line-height:14px;font-weight:500}
+.filter{background:#fff;padding:6px 18px;border-bottom:0.5px solid #E4E7ED;font-size:12px}
+.fr{display:flex;align-items:center;padding:4px 0}
+.fl{color:#909399;width:70px;flex-shrink:0}
+.fc{display:flex;flex-wrap:wrap;gap:6px}
+.fp{padding:3px 12px;background:#E6F8F8;color:#00A6A6;border:0.5px solid #B3E5E5;border-radius:3px;cursor:pointer;font-size:12px;display:inline-flex;align-items:center;gap:2px}
+.fp:hover{border-color:#00A6A6}
+.fp.act{background:#00A6A6;color:#fff;border-color:#00A6A6}
+.fp .ct{color:#F56C6C;margin-left:2px;font-size:11px}
+.fp.act .ct{color:#fff}
+.search{padding:10px 18px;background:#fff;display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;font-size:12px;border-bottom:0.5px solid #E4E7ED}
+.sg{display:flex;flex-direction:column;gap:3px}
+.sg label{color:#909399;font-size:11px}
+.sg input,.sg select{height:26px;border:0.5px solid #DCDFE6;border-radius:3px;padding:0 8px;font-size:12px;outline:none;min-width:140px;font-family:inherit;color:#303133}
+.sg input:focus,.sg select:focus{border-color:#00A6A6}
+.search .btn{padding:5px 18px;border-radius:3px;border:0.5px solid #DCDFE6;background:#fff;cursor:pointer;font-size:12px;font-family:inherit;height:26px}
+.search .btn.pri{background:#00A6A6;color:#fff;border-color:#00A6A6}
+.actions{padding:8px 18px;background:#fff;display:flex;justify-content:space-between;align-items:center;font-size:12px}
+.alg{display:flex;gap:6px}
+.alg .b{padding:4px 12px;border-radius:3px;background:#E6F8F8;color:#00A6A6;border:0.5px solid #B3E5E5;cursor:pointer;font-size:12px;font-family:inherit}
+.alg .b:hover{background:#00A6A6;color:#fff}
+.alg .b.dis{background:#F5F7FA;color:#c0c4cc;border-color:#E4E7ED;cursor:not-allowed}
+.tbl{width:100%;background:#fff;border-collapse:collapse;font-size:12px}
+.tbl th{background:#F5F7FA;padding:9px 10px;text-align:left;font-weight:500;color:#606266;border-bottom:0.5px solid #E4E7ED;white-space:nowrap}
+.tbl td{padding:9px 10px;border-bottom:0.5px solid #F0F2F5;color:#303133}
+.tbl tr{cursor:pointer}
+.tbl tr:hover{background:#F6F9F9}
+.tbl tr.sel{background:#E6F8F8}
+.tbl .st{background:#FDE2E2;color:#F56C6C;padding:1px 6px;border-radius:3px;font-size:11px;display:inline-block}
+.tbl .st2{background:#FFF7E6;color:#D46B08;padding:1px 6px;border-radius:3px;font-size:11px;display:inline-block}
+.tbl .op{color:#00A6A6;cursor:pointer;margin-right:8px}
+.tbl .op:hover{text-decoration:underline}
+.tbl input[type=checkbox]{cursor:pointer}
+.pager{padding:14px 18px;background:#fff;display:flex;justify-content:flex-end;align-items:center;gap:6px;font-size:12px;color:#606266;border-top:.5px solid #F0F2F5}
+.pg{padding:4px 9px;border:0.5px solid #DCDFE6;border-radius:3px;background:#fff;cursor:pointer;min-width:24px;text-align:center;font-size:12px;font-family:inherit}
+.pg.act{background:#00A6A6;color:#fff;border-color:#00A6A6}
+.pg:hover:not(.act):not(.d){border-color:#00A6A6;color:#00A6A6}
+.pg.d{color:#c0c4cc;cursor:not-allowed}
+.pager input{width:36px;height:24px;border:0.5px solid #DCDFE6;border-radius:3px;text-align:center;font-size:12px;margin:0 4px;font-family:inherit;outline:none}
+.pager .go{color:#00A6A6;cursor:pointer;margin-left:4px}
+.fab{position:fixed;right:24px;bottom:24px;width:56px;height:56px;border-radius:50%;background:#00A6A6;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 6px 16px rgba(0,166,166,.35);z-index:90;border:none;font-family:inherit}
+.fab:hover{background:#008C8C}
+.fab .cnt{position:absolute;top:-2px;right:-2px;background:#F56C6C;color:#fff;border-radius:10px;min-width:18px;height:18px;padding:0 5px;font-size:11px;line-height:18px;display:none;font-weight:500}
+.fab .cnt.on{display:block}
+.chat{position:fixed;right:24px;bottom:24px;width:680px;height:540px;background:#fff;border-radius:10px;box-shadow:0 12px 36px rgba(0,0,0,.18);display:none;flex-direction:row;overflow:hidden;z-index:91}
+.chat.on{display:flex}
+.cm{flex:1;display:flex;flex-direction:column;min-width:0}
+.online{font-size:11px;color:#67C23A;background:#F0F9EB;border:0.5px solid #C2E7B0;padding:1px 8px;border-radius:10px;font-weight:400}
+.online.off{color:#909399;background:#F4F4F5;border-color:#DCDFE6}
+.online.wait{color:#E6A23C;background:#FDF6EC;border-color:#F5DAB1}
+.tkrow{padding:8px 12px 0;background:#fff;display:flex;align-items:center;gap:8px}
+.tkrow .tkb{padding:5px 14px;border-radius:4px;border:0.5px solid #F56C6C;background:#FDF2F2;color:#F56C6C;cursor:pointer;font-size:12px;font-family:inherit}
+.tkrow .tkb:hover{background:#F56C6C;color:#fff}
+.tkrow .nw{padding:5px 14px;border-radius:4px;border:0.5px solid #00A6A6;background:#F0FBFB;color:#00A6A6;cursor:pointer;font-size:12px;font-family:inherit;white-space:nowrap}
+.tkrow .nw:hover{background:#00A6A6;color:#fff}
+.tkrow .hint{font-size:11px;color:#c0c4cc;margin-left:auto;white-space:nowrap}
+.rside{width:215px;background:#F5F7FA;border-left:0.5px solid #E4E7ED;overflow-y:auto;padding:12px 10px 10px;display:flex;flex-direction:column;gap:14px;flex-shrink:0}
+.rs-t{font-size:12px;font-weight:500;color:#606266;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.rs-t::before{content:"";width:3px;height:12px;background:#00A6A6;border-radius:2px}
+.staff{display:flex;flex-direction:column;gap:6px}
+.st{display:flex;align-items:center;gap:8px;font-size:12px;color:#303133}
+.st .av{width:24px;height:24px;border-radius:50%;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0}
+.st .dot{width:6px;height:6px;background:#67C23A;border-radius:50%}
+.dl,.faq{display:flex;flex-direction:column;gap:5px}
+.dl button{display:flex;align-items:center;gap:8px;padding:6px 8px;background:#fff;border:0.5px solid #E4E7ED;border-radius:4px;cursor:pointer;font-size:12px;font-family:inherit;color:#303133;text-align:left;width:100%}
+.dl button:hover{border-color:#00A6A6;color:#00A6A6}
+.dl button svg{flex-shrink:0}
+.faq button{padding:6px 8px;background:#fff;border:0.5px solid #E4E7ED;border-radius:4px;cursor:pointer;font-size:12px;font-family:inherit;color:#606266;text-align:left;line-height:1.4}
+.faq button:hover{border-color:#00A6A6;color:#00A6A6;background:#fff}
+.rf{font-size:11px;color:#909399;margin-top:auto;text-align:center;padding-top:6px}
+.rf span{cursor:pointer;color:#00A6A6}
+.cfgbtn{display:flex;align-items:center;justify-content:center;gap:5px;padding:6px 0;border:0.5px dashed #B8C4D6;color:#5B6B82;background:#fff;border-radius:6px;font-size:11px;cursor:pointer;font-family:inherit;margin-bottom:8px}
+.cfgbtn:hover{border-color:#00A6A6;color:#00A6A6;background:#EFFAFA}
+.cfgp{width:560px;max-width:92vw;max-height:82vh;overflow-y:auto}
+.cftabs{display:flex;gap:6px;border-bottom:1px solid #E4E7ED;margin:10px 0 10px}
+.cftabs button{border:none;background:none;padding:7px 14px;font-size:13px;cursor:pointer;font-family:inherit;color:#606266;border-bottom:2px solid transparent}
+.cftabs button.on{color:#00A6A6;border-bottom-color:#00A6A6;font-weight:500}
+.cftip{font-size:11px;color:#909399;background:#F5F7FA;border-radius:4px;padding:7px 9px;line-height:1.6;margin:0 0 8px}
+.cfgp textarea{width:100%;box-sizing:border-box;border:0.5px solid #DCDFE6;border-radius:4px;padding:8px;font-size:12px;font-family:Consolas,Menlo,monospace;line-height:1.7;resize:vertical;color:#303133}
+.cfgp textarea:focus{outline:none;border-color:#00A6A6}
+.cfrow{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;color:#606266;flex-wrap:wrap}
+.cfrow b{color:#303133;font-weight:500}
+.cfrow .tag{background:#F0F9EB;color:#67C23A;border:0.5px solid #C2E7B0;border-radius:10px;padding:1px 8px;font-size:11px}
+.dynrow{display:flex;gap:6px;align-items:center;margin-bottom:6px}
+.dynrow input{flex:1;border:0.5px solid #DCDFE6;border-radius:4px;padding:6px 8px;font-size:12px;font-family:inherit;color:#303133}
+.dynrow input:focus{outline:none;border-color:#00A6A6}
+.dynrow .dlabel{width:74px;flex:none;font-size:12px;color:#606266;text-align:right}
+.dynrow .dlabel.dl2{width:150px}
+.dynrow button{border:none;background:none;color:#F56C6C;cursor:pointer;font-size:17px;line-height:1;padding:2px 6px;font-family:inherit}
+.dynrow button:hover{color:#d43c3c}
+.mini{margin-top:2px;padding:5px 12px;border:0.5px solid #DCDFE6;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;font-family:inherit;color:#606266}
+.mini:hover{border-color:#00A6A6;color:#00A6A6}
+.mini.imp{border-color:#00A6A6;color:#00A6A6;background:#F0FBFB}
+.mini.imp:hover{background:#E0F6F6}
+.cfhint{font-size:11px;color:#909399}
+#importprev{margin-top:8px;border:0.5px solid #DCDFE6;border-radius:6px;padding:9px 11px;background:#FAFDFD;font-size:12px;line-height:1.7;color:#303133}
+#importprev .ip-t{font-weight:600;color:#00A6A6;margin-bottom:4px}
+#importprev .ip-tag{display:inline-block;background:#F0F9EB;color:#67C23A;border:0.5px solid #C2E7B0;border-radius:10px;padding:0 8px;font-size:11px;margin-right:6px}
+#importprev .ip-row{display:flex;align-items:center;gap:8px;margin-top:8px}
+#importprev .ip-row button{padding:5px 14px;border-radius:4px;font-size:12px;font-family:inherit;cursor:pointer}
+#importprev .ip-ok{border:none;background:#00A6A6;color:#fff}
+#importprev .ip-ok:hover{background:#009494}
+#importprev .ip-no{border:0.5px solid #DCDFE6;background:#fff;color:#606266}
+.cfempty{font-size:12px;color:#C0C4CC;text-align:center;padding:14px 0}
+.ch{padding:12px 14px;border-bottom:0.5px solid #E4E7ED;display:flex;justify-content:space-between;align-items:center;background:#fff}
+.ch .lt{display:flex;align-items:center;gap:8px}
+.ch .av{width:28px;height:28px;border-radius:50%;background:#00A6A6;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500}
+.ch b{font-weight:500;font-size:14px}
+.ch .rt{display:flex;gap:4px}
+.ch .rt button{background:none;border:none;cursor:pointer;color:#909399;padding:4px;border-radius:4px}
+.ch .rt button:hover{background:#F5F7FA;color:#00A6A6}
+.msgs{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;background:#FAFBFC}
+.bub{max-width:82%;padding:9px 12px;border-radius:10px;line-height:1.55;font-size:13px;word-break:break-word}
+.bub.u{align-self:flex-end;background:#00A6A6;color:#fff;border-bottom-right-radius:2px}
+.bub.b{align-self:flex-start;background:#fff;border:0.5px solid #E4E7ED;border-bottom-left-radius:2px}
+.acts{align-self:flex-start;display:flex;gap:6px;margin-top:-2px}
+.acts button{font-size:12px;padding:3px 10px;border-radius:4px;border:0.5px solid #DCDFE6;background:#fff;cursor:pointer;color:#606266;font-family:inherit}
+.acts button:hover{color:#00A6A6;border-color:#00A6A6}
+.acts .ok{color:#67C23A;border-color:#C2E7B0;background:#F0F9EB}
+.acts .ok::before{content:"✓ "}
+.bub.b.think{color:#9AA4AE;font-style:normal}
+.bub.b.think .dots{display:inline-block}
+.bub.b.think .dots i{display:inline-block;width:4px;height:4px;border-radius:50%;background:#9AA4AE;margin-left:3px;animation:blink 1.2s infinite}
+.bub.b.think .dots i:nth-child(2){animation-delay:0.2s}
+.bub.b.think .dots i:nth-child(3){animation-delay:0.4s}
+.bub.b p{margin:2px 0}
+.bub.b .md-h{font-weight:600;font-size:13.5px;margin:6px 0 2px;color:#1F2D3D}
+.bub.b ul,.bub.b ol{margin:3px 0;padding-left:18px}
+.bub.b li{margin:2px 0}
+.bub.b .md-code{background:#F4F6F8;border:0.5px solid #E4E7ED;border-radius:6px;padding:6px 8px;font-size:12px;overflow-x:auto;white-space:pre-wrap;font-family:Consolas,Menlo,monospace;display:block;margin:4px 0}
+.bub.b code{background:#F4F6F8;padding:1px 4px;border-radius:3px;font-size:12px;font-family:Consolas,Menlo,monospace}
+.bub.b .md-img{max-width:100%;border-radius:6px;margin:6px 0;display:block;cursor:zoom-in;border:0.5px solid #E4E7ED}
+.bub.b a{color:#00A6A6;word-break:break-all}
+@keyframes blink{0%,60%,100%{opacity:0.25}30%{opacity:1}}
+.inr{padding:10px 12px;border-top:0.5px solid #E4E7ED;display:flex;gap:8px;background:#fff;align-items:center}
+.inr input{flex:1;height:32px;border:0.5px solid #DCDFE6;border-radius:6px;padding:0 10px;outline:none;font-size:13px;font-family:inherit;color:#303133}
+.inr input:focus{border-color:#00A6A6}
+.inr .sb{height:32px;padding:0 16px;background:#00A6A6;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-family:inherit}
+.inr .sb:hover{background:#008C8C}
+.ov{position:fixed;inset:0;background:rgba(31,45,64,.5);display:none;align-items:center;justify-content:center;z-index:99}
+.ov.on{display:flex}
+.ovp{background:#fff;border-radius:10px;padding:18px;width:440px;box-shadow:0 12px 40px rgba(0,0,0,.25)}
+.ovp h3{margin:0 0 8px;font-weight:500;font-size:15px}
+.shot{background:#F4F6F8;border:0.5px solid #E4E7ED;border-radius:6px;padding:10px;margin:8px 0;font-size:11px;color:#606266}
+.shot .tl{display:flex;align-items:center;gap:6px;margin-bottom:6px;font-weight:500;color:#303133}
+.shot .lg2{width:14px;height:14px;background:#00A6A6;border-radius:3px}
+.shot .eb{background:#FFF7E6;border:0.5px solid #FFD591;color:#874D00;padding:5px 7px;border-radius:3px;margin:5px 0;line-height:1.4}
+.shot .ph{display:flex;gap:4px;margin-top:6px}
+.shot .ph div{flex:1;height:16px;background:#fff;border:0.5px solid #E4E7ED;border-radius:3px}
+.shot .mt{color:#909399;margin-top:6px;font-size:10px}
+.imgmask{position:fixed;inset:0;background:rgba(15,23,42,.72);display:none;align-items:center;justify-content:center;z-index:100;flex-direction:column}
+.imgmask.on{display:flex}
+.imgbar{display:flex;align-items:center;gap:10px;width:min(92vw,1000px);background:rgba(255,255,255,.06);border:0.5px solid rgba(255,255,255,.18);border-radius:8px 8px 0 0;padding:8px 12px;color:#E8ECF1;font-size:13px;backdrop-filter:blur(4px)}
+.imgbar .fn{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:Consolas,Menlo,monospace;font-size:12px;color:#C6CDD6}
+.imgbar button{border:none;border-radius:6px;cursor:pointer;font-size:12.5px;font-family:inherit;padding:6px 14px}
+.imgbar .dl{background:#00A6A6;color:#fff}
+.imgbar .dl:hover{background:#008C8C}
+.imgbar .cl{background:rgba(255,255,255,.14);color:#E8ECF1}
+.imgbar .cl:hover{background:rgba(255,255,255,.24)}
+.imgstage{width:min(92vw,1000px);background:#0F172A;border:0.5px solid rgba(255,255,255,.18);border-top:none;border-radius:0 0 8px 8px;padding:14px;display:flex;align-items:center;justify-content:center;min-height:240px}
+.imgstage img{max-width:100%;max-height:72vh;border-radius:4px;object-fit:contain;box-shadow:0 8px 30px rgba(0,0,0,.4)}
+.ovp .info{background:#F5F7FA;padding:8px 10px;border-radius:4px;font-size:12px;color:#606266;margin-bottom:6px;line-height:1.6}
+.ovp .info b{color:#303133;font-weight:500;margin-right:4px}
+.ovp .rw{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+.ovp .b{padding:6px 16px;border-radius:4px;border:0.5px solid #DCDFE6;background:#fff;cursor:pointer;font-size:13px;font-family:inherit;color:#606266}
+.ovp .b:hover{border-color:#00A6A6;color:#00A6A6}
+.ovp .b.pri{background:#00A6A6;color:#fff;border-color:#00A6A6}
+.ovp .b.pri:hover{background:#008C8C}
+.toast{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#F0F9EB;color:#67C23A;border:0.5px solid #C2E7B0;border-radius:6px;padding:8px 18px;display:none;z-index:100;font-size:13px;box-shadow:0 4px 12px rgba(0,0,0,.08)}
+.toast.on{display:block}
+.tip{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(31,45,64,.85);color:#fff;padding:8px 16px;border-radius:6px;font-size:13px;display:none;z-index:110}
+.tip.on{display:block}
+</style>
+</head>
+<body>
+<div class="app">
+<header class="topbar">
+  <div class="brand"><div class="lg">ZTO</div>中通冷链</div>
+  <nav class="topnav">
+    <span class="act">冷链物流</span>
+    <span>冷链云仓</span>
+    <span>财务中心</span>
+    <span>更多用户</span>
+  </nav>
+  <div class="topright">
+    <span>消息<span class="dot"></span></span>
+    <span>待处理<span class="dot"></span></span>
+    <span>最新动态<span class="bd">99+</span></span>
+    <span>帮助中心</span>
+    <span>工具</span>
+    <span>更多</span>
+  </div>
+</header>
+<div class="layout">
+<aside class="sidebar">
+  <div class="sw"><b>在场</b></div>
+  <nav class="smenu">
+    <div class="si"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8M5 10v10h14V10"/></svg>首页</div>
+    <div class="si"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="8" width="18" height="11" rx="1"/><path d="M3 12h18M7 8V5h10v3"/></svg>运营运输管理</div>
+    <div class="si act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="M4 10h16M10 4v16"/></svg>财务中心</div>
+    <div class="si"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h13l3 4v6H3z"/><circle cx="7" cy="17" r="1.5"/><circle cx="17" cy="17" r="1.5"/></svg>运输管理</div>
+    <div class="si"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21V8l9-5 9 5v13M9 21v-7h6v7"/></svg>仓储管理</div>
+    <div class="si"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg>天天服务派单</div>
+    <div class="si"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1z"/></svg>服务质量</div>
+    <div class="si"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 8h14M5 12h14M5 16h10"/></svg>天猫菜鸟服务商</div>
+    <div class="si"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l3-9 4 18 3-9h4"/></svg>派送质量本一国代一</div>
+    <div class="si"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 100 20 10 10 0 000-20z"/><path d="M2 12h20M12 2c3 3 4 6 4 10s-1 7-4 10c-3-3-4-6-4-10s1-7 4-10z"/></svg>测试宝专属号</div>
+  </nav>
+  <div class="sb"><span>投出开关</span><div class="tog" onclick="this.style.background=this.style.background==='rgb(204, 204, 204)'?'#00A6A6':'#ccc';if(this.style.background!=='#00A6A6')this.style.background='#ccc';var p=this;if(!p.dataset.on){p.dataset.on='1';p.style.background='#00A6A6'}else{p.style.background='#ccc';p.dataset.on=''}"></div></div>
+</aside>
+<main class="main">
+  <div class="mp">
+    <div class="erralert" id="errbox">
+      <div class="warn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l10 18H2L12 3z"/><path d="M12 10v5M12 18v.5"/></svg>冷链温度预警</div>
+      <p id="errtext">订单 PD20260823093643 车厢温度 12.5℃ 已超过阈值（-2~8℃），存在生鲜质量风险，请立即处理。</p>
+      <button class="btn pri" onclick="errToAssistant()">AI助理</button>
+      <button class="btn" onclick="errToTicket()">一键转工单</button>
+      <button class="x" onclick="document.getElementById('errbox').style.display='none'">×</button>
+    </div>
+    <div class="tkbox" id="tkbox">
+      <h4>本会话工单记录 <span id="tkcount">0 条</span></h4>
+      <div id="tklist"></div>
+    </div>
+    <nav class="subnav" id="subnav">
+      <span>冷链多城查询</span>
+      <span>打印</span>
+      <span>服务工单</span>
+      <span>伙伴路径</span>
+      <span class="act">订单管理</span>
+      <span>财务账单</span>
+      <span>派车单查询</span>
+      <span>报表查询</span>
+      <span>流水查询</span>
+      <span>用户管理</span>
+      <span>案件出管理</span>
+      <span>中转账款</span>
+      <span>操作历史统计</span>
+      <span>出站分拆报表</span>
+      <span>试过质量报表</span>
+    </nav>
+    <div class="tabs" id="tabs">
+      <span class="act">全部订单</span>
+      <span>营销跟进</span>
+      <span>异常工单<span class="bd">42</span></span>
+      <span>退单工单</span>
+    </div>
+    <div class="filter">
+      <div class="fr"><div class="fl">订单进度</div><div class="fc">
+        <span class="fp act">全部</span>
+        <span class="fp">待提货</span>
+        <span class="fp">派车中</span>
+        <span class="fp">待签收</span>
+      </div></div>
+      <div class="fr"><div class="fl">付款状态</div><div class="fc">
+        <span class="fp act">全部</span>
+        <span class="fp">已付<span class="ct">51</span></span>
+        <span class="fp">待付<span class="ct">5823</span></span>
+        <span class="fp">待确认<span class="ct">2624</span></span>
+        <span class="fp">运单中<span class="ct">7871</span></span>
+        <span class="fp">已签收<span class="ct">4627</span></span>
+        <span class="fp">已签收<span class="ct">2485</span></span>
+        <span class="fp">异常签收<span class="ct">16</span></span>
+        <span class="fp">已退款<span class="ct">85</span></span>
+      </div></div>
+      <div class="fr"><div class="fl">订单来源</div><div class="fc">
+        <span class="fp act">全部</span>
+        <span class="fp">宝来<span class="ct">7</span></span>
+        <span class="fp">拼购</span>
+        <span class="fp">提货</span>
+        <span class="fp">拼多多</span>
+        <span class="fp">顺丰</span>
+        <span class="fp">快手</span>
+        <span class="fp">拼多多<span class="ct">35</span></span>
+        <span class="fp">微信服务</span>
+        <span class="fp">催收</span>
+        <span class="fp">平台</span>
+      </div></div>
+      <div class="fr"><div class="fl">签收状态</div><div class="fc">
+        <span class="fp act">全部</span>
+        <span class="fp">未派车签收</span>
+        <span class="fp">在派送</span>
+        <span class="fp">正常签收</span>
+        <span class="fp">拒签签收</span>
+        <span class="fp">部分签收</span>
+      </div></div>
+    </div>
+    <div class="search">
+      <div class="sg"><label>订单时间</label><input value="2026-08-21 00:00:00"></div>
+      <div class="sg"><label>至</label><input value="2026-08-28 23:59:59"></div>
+      <div class="sg"><label>提货网点</label><input placeholder="请输入"></div>
+      <div class="sg"><label>所属省区</label><select><option>请选择</option><option>安徽省</option><option>山东省</option><option>广东省</option></select></div>
+      <div class="sg"><label>承运公司</label><select><option>请选择</option><option>中通冷链</option><option>顺丰冷运</option></select></div>
+      <div class="sg"><label>产品类型</label><select><option>请选择</option><option>生鲜</option><option>冻品</option><option>医药</option></select></div>
+      <div class="sg"><label>商家</label><input placeholder="请输入"></div>
+      <button class="btn pri">查询</button>
+      <button class="btn">重置</button>
+    </div>
+    <div class="actions">
+      <div class="alg">
+        <button class="b">新增运单</button>
+        <button class="b">修改</button>
+        <button class="b">删除</button>
+        <button class="b">结算</button>
+        <button class="b dis">导出</button>
+        <button class="b">全部</button>
+      </div>
+      <div style="color:#909399">已选 <span id="selcount">0</span> 条</div>
+    </div>
+    <table class="tbl" id="tbl">
+      <thead><tr>
+        <th width="30"><input type="checkbox" onclick="toggleAll(this)"></th>
+        <th width="50">序列</th>
+        <th>订单来源</th>
+        <th>订单状态</th>
+        <th>接单时间</th>
+        <th>提货时间</th>
+        <th>提货网点</th>
+        <th>所属省区</th>
+        <th>运单状态</th>
+        <th>订单编号</th>
+        <th>客户预约签收时间</th>
+        <th>网点预约签收时间</th>
+        <th>品名</th>
+        <th>第三方单号</th>
+        <th>操作</th>
+      </tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div class="pager">
+      <span>共 2822 条</span>
+      <select style="height:24px;border:0.5px solid #DCDFE6;border-radius:3px;padding:0 4px;font-size:12px"><option>10条/页</option><option>20条/页</option><option>50条/页</option></select>
+      <button class="pg d">‹</button>
+      <button class="pg act">1</button>
+      <button class="pg" onclick="goPage(this)">2</button>
+      <button class="pg" onclick="goPage(this)">3</button>
+      <button class="pg" onclick="goPage(this)">4</button>
+      <button class="pg" onclick="goPage(this)">5</button>
+      <button class="pg" onclick="goPage(this)">6</button>
+      <span style="padding:0 4px">...</span>
+      <button class="pg" onclick="goPage(this)">283</button>
+      <button class="pg" onclick="goPage(this)">›</button>
+      <span>前往</span>
+      <input value="1">
+      <span>页</span>
+      <span class="go" onclick="tip('已跳转')">确定</span>
+    </div>
+  </div>
+</main>
+</div>
+</div>
+<button class="fab" id="fab" onclick="toggleChat()">
+  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="7" width="16" height="12" rx="3"/><circle cx="9" cy="13" r="1.3" fill="currentColor"/><circle cx="15" cy="13" r="1.3" fill="currentColor"/><path d="M12 7V4M8 4h8"/></svg>
+  <span class="cnt" id="cnt">0</span>
+</button>
+<div class="chat" id="chat">
+  <div class="cm">
+    <div class="ch">
+      <div class="lt"><div class="av">AI</div><b>智能助理</b><span class="online wait" id="aistat">连接中</span></div>
+      <div class="rt"><button onclick="toggleChat()" title="关闭">✕</button></div>
+    </div>
+    <div class="msgs" id="msgs"></div>
+    <div class="tkrow"><button class="tkb" onclick="chatTicket()">一键转工单</button><button class="nw" onclick="newChat()">创建新对话窗口</button><span class="hint">将提取全部对话内容作为工单描述</span></div>
+    <div class="inr"><input id="inp" placeholder="请输入你的问题…" onkeydown="if(event.key==='Enter')send()"><button class="sb" onclick="send()">发送</button></div>
+  </div>
+  <div class="rside">
+    <div class="rs-sec">
+      <div class="rs-t">今日技术支持在岗<span id="dutyDate" style="float:right;color:#909399;font-weight:400;font-size:10px"></span></div>
+      <div class="staff" id="staffbox"></div>
+    </div>
+    <div class="rs-sec">
+      <div class="rs-t">下载汇总</div>
+      <div class="dl" id="dlbox"></div>
+    </div>
+    <div class="rs-sec">
+      <div class="rs-t">常见问题</div>
+      <div class="faq" id="faqbox"></div>
+    </div>
+    <button class="cfgbtn" onclick="openCfg()">⚙ 配置中台</button>
+    <div class="rf">操作手册 · <span onclick="manualGo()">进入帮助中心 ›</span></div>
+  </div>
+</div>
+<div class="ov" id="ov"><div class="ovp">
+  <h3>一键转工单（含界面截图）</h3>
+  <div class="shot" id="shot"></div>
+  <div class="info"><b>工单来源：</b>界面报错<br><b>描述：</b><span id="ovdesc"></span><br><b>附件：</b>当前界面截图 1 张</div>
+  <div class="rw"><button class="b" onclick="closeOv()">取消</button><button class="b pri" onclick="submitShot()">一键提交</button></div>
+</div></div>
+<div class="toast" id="toast">工单已提交</div>
+<div class="tip" id="tip">操作完成</div>
+<script>
+var orders=[
+{src:'拼多多',st:'待提货',st2:'warn',jt:'23:59:44',tt:'23:59:45',net:'芜湖条码二部',prov:'安徽省',cs:'PD20260823093643',c1:'2026-08-24 14:00',c2:'2026-08-24 16:00',pm:'生鲜-水果',t1:'742000455812525',t2:'742000455812525'},
+{src:'菜鸟',st:'待签收',st2:'danger',jt:'23:56:50',tt:'23:56:50',net:'青岛市杨家',prov:'山东省',cs:'CN20260823092849',c1:'2026-08-24 10:00',c2:'2026-08-24 12:00',pm:'冻品-海鲜',t1:'8202020213',t2:'8202020213'},
+{src:'菜鸟',st:'待提货',st2:'warn',jt:'23:56:50',tt:'23:56:50',net:'青岛市杨家',prov:'山东省',cs:'CN20260823092849',c1:'2026-08-24 11:00',c2:'2026-08-24 13:00',pm:'医药-疫苗',t1:'8202020487409',t2:'8202020487409'},
+{src:'拼多多',st:'待提货',st2:'warn',jt:'07:52:20',tt:'07:52:20',net:'广州百城网点',prov:'广东省',cs:'PDD_HQ20260823082508',c1:'2026-08-24 09:00',c2:'2026-08-24 11:00',pm:'生鲜-蔬菜',t1:'742000450813754',t2:'742000450813754'},
+{src:'拼多多',st:'待提货',st2:'warn',jt:'07:52:20',tt:'07:52:20',net:'广州百城网点',prov:'广东省',cs:'PDD_HQ20260823082508',c1:'2026-08-24 09:30',c2:'2026-08-24 11:30',pm:'生鲜-水果',t1:'742000450808135',t2:'742000450808135'},
+{src:'拼多多',st:'待提货',st2:'warn',jt:'07:52:20',tt:'07:52:20',net:'广州百城网点',prov:'广东省',cs:'PDD_HQ20260823082508',c1:'2026-08-24 10:00',c2:'2026-08-24 12:00',pm:'生鲜-肉品',t1:'742000450809413',t2:'742000450809413'},
+{src:'拼多多',st:'待提货',st2:'warn',jt:'07:52:20',tt:'07:52:20',net:'广州百城网点',prov:'广东省',cs:'PDD_HQ20260823082508',c1:'2026-08-24 10:30',c2:'2026-08-24 12:30',pm:'生鲜-水产',t1:'742000450813741',t2:'742000450813741'},
+{src:'拼多多',st:'待提货',st2:'warn',jt:'07:52:20',tt:'07:52:20',net:'广州百城网点',prov:'广东省',cs:'PDD_HQ20260823082508',c1:'2026-08-24 11:00',c2:'2026-08-24 13:00',pm:'生鲜-水果',t1:'742000450808496',t2:'742000450808496'},
+{src:'拼多多',st:'待提货',st2:'warn',jt:'07:52:20',tt:'07:52:20',net:'广州百城网点',prov:'广东省',cs:'PDD_HQ20260823082508',c1:'2026-08-24 11:30',c2:'2026-08-24 13:30',pm:'冻品-肉类',t1:'742000450809725',t2:'742000450809725'},
+{src:'拼多多',st:'待提货',st2:'warn',jt:'07:52:20',tt:'07:52:20',net:'广州百城网点',prov:'广东省',cs:'PDD_HQ20260823082508',c1:'2026-08-24 12:00',c2:'2026-08-24 14:00',pm:'生鲜-乳品',t1:'742000450808980',t2:'742000450808980'}
+];
+var tb=document.getElementById('tbody');
+orders.forEach(function(o,i){
+  var tr=document.createElement('tr');tr.onclick=function(){this.classList.toggle('sel');updSel()};
+  var stcls=o.st2==='danger'?'st':'st2';
+  tr.innerHTML='<td><input type="checkbox" onclick="event.stopPropagation();this.checked=!this.checked;this.parentNode.parentNode.classList.toggle(\'sel\',this.checked);updSel()"></td><td>'+(i+1)+'</td><td>'+o.src+'</td><td><span class="'+stcls+'">'+o.st+'</span></td><td>'+o.jt+'</td><td>'+o.tt+'</td><td>'+o.net+'</td><td>'+o.prov+'</td><td>'+o.cs+'</td><td style="color:#00A6A6">'+o.c1+'</td><td style="color:#00A6A6">'+o.c2+'</td><td>'+o.pm+'</td><td>'+o.t1+'</td><td><span class="op" onclick="event.stopPropagation()">改签</span><span class="op" onclick="event.stopPropagation()">分拣</span><span class="op" onclick="event.stopPropagation()">详情</span></td>';
+  tb.appendChild(tr);
+});
+function updSel(){var n=document.querySelectorAll('.tbl tr.sel').length;document.getElementById('selcount').textContent=n;}
+function toggleAll(cb){var trs=document.querySelectorAll('.tbl tbody tr');trs.forEach(function(t){var c=t.querySelector('input');c.checked=cb.checked;t.classList.toggle('sel',cb.checked)});updSel();}
+document.querySelectorAll('.si').forEach(function(s){s.onclick=function(){document.querySelectorAll('.si').forEach(function(x){x.classList.remove('act')});this.classList.add('act')}});
+document.querySelectorAll('#subnav span').forEach(function(s){s.onclick=function(){document.querySelectorAll('#subnav span').forEach(function(x){x.classList.remove('act')});this.classList.add('act')}});
+document.querySelectorAll('#tabs span').forEach(function(s){s.onclick=function(){document.querySelectorAll('#tabs span').forEach(function(x){x.classList.remove('act')});this.classList.add('act')}});
+document.querySelectorAll('.fc').forEach(function(fc){var fps=fc.querySelectorAll('.fp');fps.forEach(function(fp){fp.onclick=function(){fps.forEach(function(x){x.classList.remove('act')});this.classList.add('act')}})});
+function goPage(b){document.querySelectorAll('.pg').forEach(function(x){x.classList.remove('act')});if(!isNaN(parseInt(b.textContent))){b.classList.add('act')}}
+var seq=0;
+var hist=[];var sess=null;var aiOK=false;
+function toggleChat(){var c=document.getElementById('chat');c.classList.toggle('on');if(c.classList.contains('on')&&!seq){addB('你好，我是中通冷链的智能助理。可以问我订单查询、异常处理、操作指引等问题，遇到无法解决的也可以点「一键转工单」转人工。')}}
+function newChat(){var m=document.getElementById('msgs');m.innerHTML='';hist=[];sess=null;addB('你好，我是中通冷链的智能助理。这是新的对话窗口，可以问我订单查询、异常处理、操作指引等问题。');toast('已清除历史对话，创建新对话窗口')}
+function addU(t){var m=document.getElementById('msgs');var d=document.createElement('div');d.className='bub u';d.textContent=t;m.appendChild(d);m.scrollTop=m.scrollHeight;return d}
+function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function mdToHtml(t){
+  t=escHtml(t);
+  t=t.replace(/```(\w*)\n([\s\S]*?)```/g,function(m,l,c){return '<pre class="md-code"><code>'+c+'</code></pre>'});
+  var lines=t.split('\n'),out=[],inList=false;
+  for(var i=0;i<lines.length;i++){
+    var L=lines[i];
+    var mh=L.match(/^(#{1,4})\s+(.*)$/);
+    if(mh){if(inList){out.push('</ul>');inList=false}out.push('<div class="md-h">'+mh[2]+'</div>');continue}
+    var li=L.match(/^\s*[-*]\s+(.+)$/)||L.match(/^\s*\d+[.、]\s+(.+)$/);
+    if(li){if(!inList){out.push('<ul>');inList=true}out.push('<li>'+li[1]+'</li>');continue}
+    if(inList){out.push('</ul>');inList=false}
+    if(L.trim())out.push('<p>'+L+'</p>');
+  }
+  if(inList)out.push('</ul>');
+  t=out.join('');
+  t=t.replace(/`([^`]+)`/g,'<code>$1</code>');
+  t=t.replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>');
+  t=t.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g,'<img class="md-img" src="$2" alt="$1" loading="lazy" onclick="openImg(this.src)">');
+  t=t.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>');
+  return t;
+}
+function addB(t){var m=document.getElementById('msgs');var d=document.createElement('div');d.className='bub b';d.innerHTML=mdToHtml(t);m.appendChild(d);var a=document.createElement('div');a.className='acts';a.innerHTML='<button onclick="useful(this)">👍 有用</button>';m.appendChild(a);m.scrollTop=m.scrollHeight;return d}
+function useful(b){b.parentNode.innerHTML='<span class="ok">感谢反馈</span>';b.parentNode.previousElementSibling.style.background='#F0F9EB';b.parentNode.previousElementSibling.style.borderColor='#C2E7B0'}
+function send(){var i=document.getElementById('inp');var q=i.value.trim();if(!q)return;i.value='';addU(q);askAI(q)}
+function addTyping(){var m=document.getElementById('msgs');var d=document.createElement('div');d.className='bub b think';d.innerHTML='正在思考<span class="dots"><i></i><i></i><i></i></span>';m.appendChild(d);m.scrollTop=m.scrollHeight;return d}
+function askAI(q,fb){
+hist.push({role:'user',content:q});
+var tp=addTyping();
+fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:hist,session_id:sess,prompt:q})}).then(function(r){return r.json()}).then(function(d){
+tp.remove();
+if(d.success&&d.reply){sess=d.session_id||sess;hist.push({role:'assistant',content:d.reply});aiOK=true;setStat('百炼已连接');addB(d.reply)}
+else{hist.pop();if(d.error)toast('AI 服务提示：'+d.error);fallback(fb,q)}
+}).catch(function(){tp.remove();hist.pop();fallback(fb,q)});
+}
+function fallback(fb,q){addB(fb||('已收到你的问题「'+q+'」。当前为离线演示模式，我可以帮你：1) 查看订单详情；2) 查询提货进度；3) 处理温度异常。需要转人工可点输入框上方的「一键转工单」。'))}
+function setStat(t){var s=document.getElementById('aistat');if(!s)return;s.textContent=t;s.className=t==='百炼已连接'?'online':(t==='离线演示'?'online off':'online wait')}
+fetch('/api/ping').then(function(r){return r.json()}).then(function(d){setStat(d.configured?'百炼已连接':'代理未配置')}).catch(function(){setStat('离线演示')});
+function chatTicket(){var ms=document.getElementById('msgs').children;var arr=[];for(var i=0;i<ms.length;i++){if(ms[i].classList.contains('u')){arr.push('【问】'+ms[i].textContent)}else if(ms[i].classList.contains('b')){arr.push('【答】'+ms[i].textContent)}}
+if(!arr.length){toast('暂无对话内容可提取');return}
+createTicket('对话反馈',arr.join('\n'));toast('已生成工单，全部对话内容已作为描述带入')}
+var FAQ={'如何查询订单提货进度？':'可在「订单管理」中搜索订单编号查看运单状态，或点击运单行「详情」查看实时轨迹。','温度异常怎么处理？':'系统检测到超温会触发预警（如页面顶部黄色条）。建议立即联系司机调温；若已影响品质可按 SOP 走理赔，也可点「一键转工单」转人工协助。','PDA 无法登录怎么办？':'先检查网络与账号权限；仍无法登录可在右侧「下载汇总」重装 PDA 最新版，或联系今日在岗技术支持（李勇/乔羽/韩刚）。','如何申请退单？':'在「订单管理」勾选对应订单后点击上方「退单」，状态变为待确认后由财务审核，可在「退单工单」标签查看进度。','签收异常如何操作？':'在运单「详情」中标记异常签收原因（拒收/部分签收等），系统会生成异常工单进入「异常工单」列表，由网点核实处理。'};
+function faqGo(q,a){addU(q);askAI(q,a||FAQ[q]||'已收到你的问题，正在查询中…')}
+function dlGoBy(i){var x=SIDEBAR.downloads[i];if(!x)return;if(x.url){var a=document.createElement('a');a.href=x.url;a.target='_blank';a.rel='noopener';document.body.appendChild(a);a.click();a.remove();toast('正在打开/下载：'+x.name)}else{toast('「'+x.name+'」尚未配置下载链接，请到 ⚙ 配置中台填写')}}
+function faqGoBy(i){var x=SIDEBAR.faq[i];if(x)faqGo(x.q,x.a)}
+/* ================= 配置中台 ================= */
+var DEFAULT_SIDEBAR={
+  onDuty:{byDate:{},byWeekday:{
+    '周一':['李勇','乔羽','韩刚'],
+    '周二':['李勇','乔羽'],
+    '周三':['韩刚','乔羽'],
+    '周四':['李勇','韩刚'],
+    '周五':['李勇','乔羽','韩刚'],
+    '周六':['乔羽'],
+    '周日':[]
+  }},
+  downloads:[
+    {name:'PDA下载',url:'',desc:'PDA 手持终端 V3.2.1'},
+    {name:'鲸小宝(安卓)',url:'',desc:'Android 6.8.0'},
+    {name:'鲸小宝(苹果)',url:'',desc:'iOS 6.8.0'}
+  ],
+  faq:[
+    {q:'如何查询订单提货进度？',a:'可在「订单管理」中搜索订单编号查看运单状态，或点击运单行「详情」查看实时轨迹。'},
+    {q:'温度异常怎么处理？',a:'系统检测到超温会触发预警（如页面顶部黄色条）。建议立即联系司机调温；若已影响品质可按 SOP 走理赔，也可点「一键转工单」转人工协助。'},
+    {q:'PDA 无法登录怎么办？',a:'先检查网络与账号权限；仍无法登录可在右侧「下载汇总」重装 PDA 最新版，或联系今日在岗技术支持。'},
+    {q:'如何申请退单？',a:'在「订单管理」勾选对应订单后点击上方「退单」，状态变为待确认后由财务审核，可在「退单工单」标签查看进度。'},
+    {q:'签收异常如何操作？',a:'在运单「详情」中标记异常签收原因（拒收/部分签收等），系统会生成异常工单进入「异常工单」列表，由网点核实处理。'}
+  ]
+};
+var SIDEBAR=JSON.parse(JSON.stringify(DEFAULT_SIDEBAR));
+var WEEK_CN=['周日','周一','周二','周三','周四','周五','周六'];
+function todayDuty(sb){
+  var now=new Date(),p=function(n){return String(n).padStart(2,'0')};
+  var ds=now.getFullYear()+'-'+p(now.getMonth()+1)+'-'+p(now.getDate());
+  var wk=WEEK_CN[now.getDay()];
+  var bd=(sb.onDuty&&sb.onDuty.byDate)||{},bw=(sb.onDuty&&sb.onDuty.byWeekday)||{};
+  return {date:ds,weekday:wk,staff:bd[ds]||bw[wk]||[]};
+}
+function mergeSidebar(c){
+  c=c||{};
+  var out=JSON.parse(JSON.stringify(DEFAULT_SIDEBAR));
+  if(c.onDuty){out.onDuty.byDate=c.onDuty.byDate||{};if(c.onDuty.byWeekday)out.onDuty.byWeekday=c.onDuty.byWeekday;}
+  if(Array.isArray(c.downloads)&&c.downloads.length)out.downloads=c.downloads;
+  if(Array.isArray(c.faq)&&c.faq.length)out.faq=c.faq;
+  return out;
+}
+function renderSidebar(){
+  var sb=SIDEBAR,t=todayDuty(sb);
+  var dd=document.getElementById('dutyDate');if(dd)dd.textContent=t.weekday+' '+t.date;
+  var sbx=document.getElementById('staffbox');
+  if(t.staff&&t.staff.length){
+    var cols=['#7F77DD','#1D9E75','#D85A30','#00A6A6','#E6A23C','#5B8FF9','#9254DE','#13C2C2'];
+    sbx.innerHTML=t.staff.map(function(n,i){
+      var nm=escHtml(n);
+      return '<div class="st"><div class="av" style="background:'+cols[i%cols.length]+'">'+nm.charAt(0)+'</div>'+nm+'<span class="dot"></span></div>';
+    }).join('');
+  }else{
+    sbx.innerHTML='<div class="cfempty">今日暂无值班安排<br>到 ⚙ 配置中台导入值班表</div>';
+  }
+  var dlb=document.getElementById('dlbox');
+  if(sb.downloads&&sb.downloads.length){
+    dlb.innerHTML=sb.downloads.map(function(x,i){
+      var nm=escHtml(x.name||('下载项'+(i+1)));
+      return '<button onclick="dlGoBy('+i+')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#00A6A6" stroke-width="2"><path d="M12 4v11m0 0l-4-4m4 4l4-4M5 19h14"/></svg>'+nm+'</button>';
+    }).join('');
+  }else dlb.innerHTML='<div class="cfempty">暂无下载项<br>到 ⚙ 配置中台添加</div>';
+  var fqb=document.getElementById('faqbox');
+  if(sb.faq&&sb.faq.length){
+    fqb.innerHTML=sb.faq.map(function(x,i){
+      return '<button onclick="faqGoBy('+i+')">'+escHtml(x.q||('问题'+(i+1)))+'</button>';
+    }).join('');
+  }else fqb.innerHTML='<div class="cfempty">暂无常见问题<br>到 ⚙ 配置中台添加</div>';
+}
+function loadSidebar(){
+  fetch('/api/sidebar').then(function(r){return r.json()}).then(function(d){
+    if(d.success&&d.config){SIDEBAR=mergeSidebar(d.config);renderSidebar()}
+    else renderSidebar();
+  }).catch(function(){
+    try{var ls=localStorage.getItem('zt_sidebar');if(ls)SIDEBAR=mergeSidebar(JSON.parse(ls));}catch(e){}
+    renderSidebar();
+  });
+}
+/* ---- 配置弹窗 ---- */
+function openCfg(){
+  var sb=SIDEBAR;
+  var txt=[];
+  var bw=sb.onDuty.byWeekday||{},bd=sb.onDuty.byDate||{};
+  WEEK_CN.slice(1).concat(['周日']).forEach(function(w){if(bw[w]&&bw[w].length)txt.push(w+'：'+bw[w].join(','))});
+  Object.keys(bd).sort().forEach(function(d){if(bd[d].length)txt.push(d+'：'+bd[d].join(','))});
+  document.getElementById('dutytext').value=txt.join('\n');
+  var dlb=document.getElementById('dllist');dlb.innerHTML='';
+  (sb.downloads||[]).forEach(function(x){addDlRow(x)});
+  if(!(sb.downloads||[]).length)addDlRow();
+  var fqb=document.getElementById('faqlist');fqb.innerHTML='';
+  (sb.faq||[]).forEach(function(x){addFaqRow(x)});
+  if(!(sb.faq||[]).length)addFaqRow();
+  parseDuty();
+  document.getElementById('cfgov').classList.add('on');
+}
+function closeCfg(){document.getElementById('cfgov').classList.remove('on')}
+function cfgTab(t){
+  var tabs=document.querySelectorAll('.cftabs button');
+  for(var i=0;i<tabs.length;i++)tabs[i].className=tabs[i].getAttribute('data-t')===t?'on':'';
+  ['duty','dl','faq'].forEach(function(k){document.getElementById('tab-'+k).style.display=k===t?'':'none'});
+}
+/* ---- 值班表解析：支持「周X：人名」/「日期：人名」/ Excel 粘贴 / JSON ---- */
+function parseDutyText(text){
+  var byDate={},byWeekday={};
+  var t=(text||'').trim();
+  if(!t)return {byDate:byDate,byWeekday:byWeekday};
+  if(t.charAt(0)==='{'){
+    try{var j=JSON.parse(t);if(j.byDate)byDate=j.byDate;if(j.byWeekday)byWeekday=j.byWeekday;return {byDate:byDate,byWeekday:byWeekday};}catch(e){}
+  }
+  t.split(/\r?\n/).forEach(function(line){
+    if(!line.trim())return;
+    var m=line.match(/^\s*([^：:]+)\s*[：:]\s*(.+)$/),key,val;
+    if(m){key=m[1].trim();val=m[2];}
+    else{
+      var parts=line.split(/[\t\s]+/).filter(Boolean);
+      if(parts.length>=2){key=parts[0];val=parts.slice(1).join(',');}
+      else return;
+    }
+    if(!key||!val)return;
+    var names=val.split(/[,，、;；\s]+/).filter(Boolean);
+    if(!names.length)return;
+    if(/^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/.test(key)){
+      var dm=key.replace(/\//g,'-').match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+      byDate[dm[1]+'-'+('0'+dm[2]).slice(-2)+'-'+('0'+dm[3]).slice(-2)]=names;
+    }else{
+      var wk=key.replace('星期','周').replace('礼拜','周').replace('周天','周日');
+      byWeekday[wk]=names;
+    }
+  });
+  return {byDate:byDate,byWeekday:byWeekday};
+}
+function parseDuty(){
+  var r=parseDutyText(document.getElementById('dutytext').value);
+  var t=todayDuty({onDuty:r});
+  var el=document.getElementById('dutynow');
+  el.innerHTML=t.staff.length
+    ? escHtml(t.staff.join('、'))+' <span class="tag">'+t.weekday+' '+t.date+'</span>'
+    : '（今日 '+t.weekday+' '+t.date+' 无匹配值班）';
+  document.getElementById('dutytext').setAttribute('data-ok',t.staff.length?'1':'0');
+}
+/* ---- 下载 / FAQ 动态行 ---- */
+function addDlRow(x){
+  x=x||{};
+  var row=document.createElement('div');row.className='dynrow';
+  row.innerHTML='<span class="dlabel dl2">名称</span><input class="nm" placeholder="如：PDA下载" value="'+escHtml(x.name||'')+'"><span class="dlabel">链接</span><input class="ur" placeholder="https://…（留空则不可点）" value="'+escHtml(x.url||'')+'"><button onclick="this.parentNode.remove()">✕</button>';
+  document.getElementById('dllist').appendChild(row);
+}
+function addFaqRow(x){
+  x=x||{};
+  var row=document.createElement('div');row.className='dynrow';
+  row.innerHTML='<span class="dlabel dl2">问题</span><input class="q" placeholder="如：如何查询订单提货进度？" value="'+escHtml(x.q||'')+'"><span class="dlabel">答案</span><input class="a" placeholder="点击后回复内容（留空走 AI）" value="'+escHtml(x.a||'')+'"><button onclick="this.parentNode.remove()">✕</button>';
+  document.getElementById('faqlist').appendChild(row);
+}
+/* ---- 保存 ---- */
+function collectCfg(){
+  var r=parseDutyText(document.getElementById('dutytext').value);
+  var dls=[],drows=document.querySelectorAll('#dllist .dynrow');
+  for(var i=0;i<drows.length;i++){
+    var nm=drows[i].querySelector('.nm').value.trim(),ur=drows[i].querySelector('.ur').value.trim();
+    if(nm)dls.push({name:nm,url:ur});
+  }
+  var fqs=[],frows=document.querySelectorAll('#faqlist .dynrow');
+  for(var j=0;j<frows.length;j++){
+    var q=frows[j].querySelector('.q').value.trim(),a=frows[j].querySelector('.a').value.trim();
+    if(q)fqs.push({q:q,a:a});
+  }
+  return {onDuty:r,downloads:dls,faq:fqs};
+}
+function saveSidebar(){
+  var cfg=collectCfg();
+  fetch('/api/sidebar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({config:cfg})})
+    .then(function(r){return r.json()}).then(function(d){
+      if(d.success){SIDEBAR=mergeSidebar(d.config);renderSidebar();closeCfg();toast('配置已保存并生效');}
+      else toast('保存失败：'+(d.error||'未知错误'));
+    }).catch(function(){
+      try{localStorage.setItem('zt_sidebar',JSON.stringify(cfg));}catch(e){}
+      SIDEBAR=mergeSidebar(cfg);renderSidebar();closeCfg();toast('已保存到本地（代理未连接，重启后仍有效）');
+    });
+}
+/* ---- 值班表 Excel 导入 ---- */
+function importExcel(){document.getElementById('excelfile').click()}
+function onExcelFile(inp){
+  var f=inp.files[0];inp.value='';
+  if(!f)return;
+  if(!/\.(xlsx|xls)$/i.test(f.name)){toast('仅支持 .xlsx / .xls 格式');return}
+  if(f.size>8*1024*1024){toast('文件过大（限 8MB）');return}
+  var rd=new FileReader();
+  rd.onload=function(){
+    var b64=(rd.result||'').split(',')[1]||'';
+    toast('正在解析值班表…');
+    fetch('/api/sidebar/import-excel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filename:f.name,base64:b64})})
+      .then(function(r){return r.json()}).then(function(d){
+        if(!d.ok){toast('解析失败：'+(d.error||'未知错误'));return}
+        showImportPreview(d);
+      }).catch(function(){toast('导入失败：代理服务未连接')});
+  };
+  rd.readAsDataURL(f);
+}
+function cnWeek(ds){
+  return '周'+'日一二三四五六'[new Date(ds).getDay()];
+}
+function showImportPreview(d){
+  var m=d.meta,od=d.onDuty;
+  var today=todayStr();
+  var wk=cnWeek(today);
+  var staff=(od.byDate[today]||od.byWeekday[wk]||od.byWeekday['星期'+wk.slice(1)]||[]).join('、')||'（无）';
+  var el=document.getElementById('importprev');
+  el.style.display='block';
+  el.innerHTML='<div class="ip-t">📋 解析成功（'+escHtml(d.usedSheet||'工作表')+'）</div>'+
+    '<div>识别到 <b>'+m.staffCount+'</b> 名员工（'+escHtml(m.staff.join('、'))+'），排班记录 <b>'+m.records+'</b> 条（含休息 '+m.restRecords+' 条），覆盖 <b>'+m.dateFrom+' ~ '+m.dateTo+'</b>，共 '+m.dutyDates+' 个在岗日。</div>'+
+    '<div>📅 今日（'+today+' '+cnWeek(today)+'）值班：<b>'+escHtml(staff)+'</b></div>'+
+    '<div class="ip-row"><button class="ip-ok" onclick="applyImport()">✓ 应用并保存</button><button class="ip-no" onclick="cancelImport()">取消</button></div>';
+  window._impDuty=od;
+}
+function cancelImport(){document.getElementById('importprev').style.display='none';window._impDuty=null}
+function applyImport(){
+  var od=window._impDuty;if(!od)return;
+  var cur=parseDutyText(document.getElementById('dutytext').value);
+  // 归一化 Excel 的 byWeekday 键（星期一→周一）并覆盖同名旧键
+  var exc=od.byWeekday||{},norm={};
+  Object.keys(exc).forEach(function(k){
+    var nk=k.replace('星期','周').replace('礼拜','周').replace('周天','周日');
+    norm[nk]=exc[k];
+  });
+  var merged={byDate:Object.assign({},cur.byDate,od.byDate),byWeekday:Object.assign({},cur.byWeekday,norm)};
+  document.getElementById('dutytext').value=Object.keys(merged.byDate).sort().map(function(k){return k+'：'+merged.byDate[k].join(',')}).join('\n');
+  var cfg=collectCfg();cfg.onDuty=merged;
+  fetch('/api/sidebar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({config:cfg})})
+    .then(function(r){return r.json()}).then(function(d){
+      if(d.success){SIDEBAR=mergeSidebar(d.config);renderSidebar();closeCfg();toast('值班表已导入并生效');}
+      else toast('保存失败：'+(d.error||'未知错误'));
+    }).catch(function(){
+      try{localStorage.setItem('zt_sidebar',JSON.stringify(cfg));}catch(e){}
+      SIDEBAR=mergeSidebar(cfg);renderSidebar();closeCfg();toast('已保存到本地（代理未连接，重启后仍有效）');
+    });
+  window._impDuty=null;
+}
+function todayStr(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0')}
+loadSidebar();
+function createTicket(src,desc){seq++;var id='GD-20260828-'+String(seq).padStart(3,'0');var box=document.getElementById('tkbox');var list=document.getElementById('tklist');box.classList.add('on');var d=document.createElement('div');d.className='ti';d.innerHTML='<span class="id">'+id+'</span><span class="src">['+src+']</span><span class="ds" title="'+desc.replace(/"/g,'')+'">'+desc+'</span>';list.appendChild(d);document.getElementById('tkcount').textContent=seq+' 条';var cnt=document.getElementById('cnt');cnt.textContent=seq;cnt.classList.add('on');return id}
+function toast(t){var e=document.getElementById('toast');e.textContent=t;e.classList.add('on');setTimeout(function(){e.classList.remove('on')},2200)}
+function tip(t){var e=document.getElementById('tip');e.textContent=t;e.classList.add('on');setTimeout(function(){e.classList.remove('on')},1200)}
+function manualGo(){addU('打开操作手册');setTimeout(function(){addB('已为你定位到「操作手册」。可先看第三章：订单管理与异常处理；如需某章节详细内容，直接在下方输入。')},300)}
+function errToAssistant(){var c=document.getElementById('chat');c.classList.add('on');var err=document.getElementById('errtext').textContent;addU('页面报错了：'+err);askAI('中通冷链订单管理系统页面出现报错：「'+err+'」。请分析可能的原因并给出处理建议。',cannedErr(err))}
+function cannedErr(err){return '已分析这条温度预警：当前车厢 12.5℃ 已超出冷藏阈值（-2~8℃），属于 II 级异常。建议：1) 立即联系司机 PD20260823093643 调温或检查制冷设备；2) 若已影响生鲜品质，按公司 SOP 启动理赔流程；3) 需我直接生成处理工单吗？'}
+function errToTicket(){var err=document.getElementById('errtext').textContent;document.getElementById('shot').innerHTML='<div class="tl"><div class="lg2"></div>中通冷链 / 财务中心 / 订单管理</div><div class="eb">⚠ '+err+'</div><div class="ph"><div></div><div></div><div></div><div></div></div><div class="mt">截图时间 2026-08-28 16:08 · 尺寸 1280×720 · 286KB</div>';document.getElementById('ovdesc').textContent=err;document.getElementById('ov').classList.add('on')}
+function closeOv(){document.getElementById('ov').classList.remove('on')}
+function submitShot(){var err=document.getElementById('errtext').textContent;createTicket('界面报错（附截图）',err);closeOv();toast('工单已提交，截图已作为附件上传')}
+function imgFileName(url){var n=(url.split('?')[0].split('/').pop())||'';return n||('image-'+Date.now()+'.png')}
+function openImg(src){var m=document.getElementById('imgmask');document.getElementById('imgview').src=src;document.getElementById('imgfn').textContent=imgFileName(src);m.classList.add('on')}
+function closeImg(){document.getElementById('imgmask').classList.remove('on')}
+function downloadImg(){
+  var url=document.getElementById('imgview').src;var name=imgFileName(url);
+  fetch('/api/imgproxy?url='+encodeURIComponent(url)).then(function(r){if(!r.ok)throw new Error('http'+r.status);return r.blob()}).then(function(b){
+    var u=URL.createObjectURL(b);var a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u)},2000);
+    toast('图片已开始下载：'+name);
+  }).catch(function(){
+    var a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener';document.body.appendChild(a);a.click();a.remove();
+    toast('下载失败，已在新窗口打开，可右键「图片另存为」');
+  });
+}
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeImg()});
+</script>
+<div class="imgmask" id="imgmask" onclick="if(event.target===this)closeImg()">
+  <div class="imgbar">
+    <span class="fn" id="imgfn"></span>
+    <button class="dl" onclick="downloadImg()">⬇ 下载图片</button>
+    <button class="cl" onclick="closeImg()">✕ 关闭</button>
+  </div>
+  <div class="imgstage"><img id="imgview" alt="图片预览"></div>
+</div>
+<div class="ov" id="cfgov" onclick="if(event.target===this)closeCfg()"><div class="ovp cfgp">
+  <h3>⚙ 配置中台</h3>
+  <div class="cftabs">
+    <button class="on" data-t="duty" onclick="cfgTab('duty')">值班表</button>
+    <button data-t="dl" onclick="cfgTab('dl')">下载汇总</button>
+    <button data-t="faq" onclick="cfgTab('faq')">常见问题</button>
+  </div>
+  <div class="cftab" id="tab-duty">
+    <p class="cftip">粘贴值班表，每行一条：<b>「周一：李勇,乔羽」</b>（按星期）或 <b>「2026-08-31：王五,赵六」</b>（按日期，优先于星期）。也可以直接粘贴 Excel 复制的内容（第一列日期/星期，其余列姓名），或整段 JSON。</p>
+    <div class="cfrow"><button class="mini imp" onclick="importExcel()">📥 导入 Excel 值班表</button><span class="cfhint">支持 .xlsx / .xls，自动识别「排班主数据」「员工全月排班」表</span></div>
+    <input type="file" id="excelfile" accept=".xlsx,.xls" style="display:none" onchange="onExcelFile(this)">
+    <textarea id="dutytext" rows="6" placeholder="周一：李勇,乔羽,韩刚&#10;周二：张三,李四&#10;2026-08-31：王五,赵六&#10;…"></textarea>
+    <div class="cfrow"><span>今日值班预览：</span><b id="dutynow">（尚未解析）</b></div>
+    <div class="cfrow" style="margin-top:2px"><button class="mini" onclick="parseDuty()">解析预览</button></div>
+    <div id="importprev" style="display:none"></div>
+  </div>
+  <div class="cftab" id="tab-dl" style="display:none">
+    <p class="cftip">配置下载项：名称 + 真实文件链接（http/https），点击侧边栏按钮即打开/下载。链接留空则暂不可点。</p>
+    <div id="dllist"></div>
+    <button class="mini" onclick="addDlRow()">+ 添加下载项</button>
+  </div>
+  <div class="cftab" id="tab-faq" style="display:none">
+    <p class="cftip">配置常见问题：问题 + 答案。点击侧边栏问题按钮时自动带入对话，回复内容取自答案（未配置答案时走 AI 生成）。</p>
+    <div id="faqlist"></div>
+    <button class="mini" onclick="addFaqRow()">+ 添加常见问题</button>
+  </div>
+  <div class="rw">
+    <button class="b" onclick="closeCfg()">取消</button>
+    <button class="b pri" onclick="saveSidebar()">保存配置</button>
+  </div>
+</div></div>
+</body>
+</html>
