@@ -104,6 +104,8 @@ html,body{margin:0;padding:0;font-family:-apple-system,"PingFang SC","Microsoft 
 .fab .cnt.on{display:block}
 .chat{position:fixed;right:24px;bottom:24px;width:680px;height:540px;background:#fff;border-radius:10px;box-shadow:0 12px 36px rgba(0,0,0,.18);display:none;flex-direction:row;overflow:hidden;z-index:91}
 .chat.on{display:flex}
+.chat.max{inset:16px;width:auto;height:auto;border-radius:12px}
+.chat.max .rside{width:260px}
 .cm{flex:1;display:flex;flex-direction:column;min-width:0}
 .online{font-size:11px;color:#67C23A;background:#F0F9EB;border:0.5px solid #C2E7B0;padding:1px 8px;border-radius:10px;font-weight:400}
 .online.off{color:#909399;background:#F4F4F5;border-color:#DCDFE6}
@@ -114,7 +116,7 @@ html,body{margin:0;padding:0;font-family:-apple-system,"PingFang SC","Microsoft 
 .tkrow .nw{padding:5px 14px;border-radius:4px;border:0.5px solid #00A6A6;background:#F0FBFB;color:#00A6A6;cursor:pointer;font-size:12px;font-family:inherit;white-space:nowrap}
 .tkrow .nw:hover{background:#00A6A6;color:#fff}
 .tkrow .hint{font-size:11px;color:#c0c4cc;margin-left:auto;white-space:nowrap}
-.rside{width:215px;background:#F5F7FA;border-left:0.5px solid #E4E7ED;overflow-y:auto;padding:12px 10px 10px;display:flex;flex-direction:column;gap:14px;flex-shrink:0}
+.rside{width:215px;background:#F5F7FA;border-left:0.5px solid #E4E7ED;overflow-y:auto;padding:52px 10px 10px;display:flex;flex-direction:column;gap:14px;flex-shrink:0}
 .rs-t{font-size:12px;font-weight:500;color:#606266;margin-bottom:8px;display:flex;align-items:center;gap:6px}
 .rs-t::before{content:"";width:3px;height:12px;background:#00A6A6;border-radius:2px}
 .staff{display:flex;flex-direction:column;gap:6px}
@@ -129,46 +131,14 @@ html,body{margin:0;padding:0;font-family:-apple-system,"PingFang SC","Microsoft 
 .faq button:hover{border-color:#00A6A6;color:#00A6A6;background:#fff}
 .rf{font-size:11px;color:#909399;margin-top:auto;text-align:center;padding-top:6px}
 .rf span{cursor:pointer;color:#00A6A6}
-.cfgbtn{display:flex;align-items:center;justify-content:center;gap:5px;padding:6px 0;border:0.5px dashed #B8C4D6;color:#5B6B82;background:#fff;border-radius:6px;font-size:11px;cursor:pointer;font-family:inherit;margin-bottom:8px}
-.cfgbtn:hover{border-color:#00A6A6;color:#00A6A6;background:#EFFAFA}
-.cfgp{width:560px;max-width:92vw;max-height:82vh;overflow-y:auto}
-.cftabs{display:flex;gap:6px;border-bottom:1px solid #E4E7ED;margin:10px 0 10px}
-.cftabs button{border:none;background:none;padding:7px 14px;font-size:13px;cursor:pointer;font-family:inherit;color:#606266;border-bottom:2px solid transparent}
-.cftabs button.on{color:#00A6A6;border-bottom-color:#00A6A6;font-weight:500}
-.cftip{font-size:11px;color:#909399;background:#F5F7FA;border-radius:4px;padding:7px 9px;line-height:1.6;margin:0 0 8px}
-.cfgp textarea{width:100%;box-sizing:border-box;border:0.5px solid #DCDFE6;border-radius:4px;padding:8px;font-size:12px;font-family:Consolas,Menlo,monospace;line-height:1.7;resize:vertical;color:#303133}
-.cfgp textarea:focus{outline:none;border-color:#00A6A6}
-.cfrow{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;color:#606266;flex-wrap:wrap}
-.cfrow b{color:#303133;font-weight:500}
-.cfrow .tag{background:#F0F9EB;color:#67C23A;border:0.5px solid #C2E7B0;border-radius:10px;padding:1px 8px;font-size:11px}
-.dynrow{display:flex;gap:6px;align-items:center;margin-bottom:6px}
-.dynrow input{flex:1;border:0.5px solid #DCDFE6;border-radius:4px;padding:6px 8px;font-size:12px;font-family:inherit;color:#303133}
-.dynrow input:focus{outline:none;border-color:#00A6A6}
-.dynrow .dlabel{width:74px;flex:none;font-size:12px;color:#606266;text-align:right}
-.dynrow .dlabel.dl2{width:150px}
-.dynrow button{border:none;background:none;color:#F56C6C;cursor:pointer;font-size:17px;line-height:1;padding:2px 6px;font-family:inherit}
-.dynrow button:hover{color:#d43c3c}
-.mini{margin-top:2px;padding:5px 12px;border:0.5px solid #DCDFE6;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;font-family:inherit;color:#606266}
-.mini:hover{border-color:#00A6A6;color:#00A6A6}
-.mini.imp{border-color:#00A6A6;color:#00A6A6;background:#F0FBFB}
-.mini.imp:hover{background:#E0F6F6}
-.cfhint{font-size:11px;color:#909399}
-#importprev{margin-top:8px;border:0.5px solid #DCDFE6;border-radius:6px;padding:9px 11px;background:#FAFDFD;font-size:12px;line-height:1.7;color:#303133}
-#importprev .ip-t{font-weight:600;color:#00A6A6;margin-bottom:4px}
-#importprev .ip-tag{display:inline-block;background:#F0F9EB;color:#67C23A;border:0.5px solid #C2E7B0;border-radius:10px;padding:0 8px;font-size:11px;margin-right:6px}
-#importprev .ip-row{display:flex;align-items:center;gap:8px;margin-top:8px}
-#importprev .ip-row button{padding:5px 14px;border-radius:4px;font-size:12px;font-family:inherit;cursor:pointer}
-#importprev .ip-ok{border:none;background:#00A6A6;color:#fff}
-#importprev .ip-ok:hover{background:#009494}
-#importprev .ip-no{border:0.5px solid #DCDFE6;background:#fff;color:#606266}
 .cfempty{font-size:12px;color:#C0C4CC;text-align:center;padding:14px 0}
 .ch{padding:12px 14px;border-bottom:0.5px solid #E4E7ED;display:flex;justify-content:space-between;align-items:center;background:#fff}
 .ch .lt{display:flex;align-items:center;gap:8px}
 .ch .av{width:28px;height:28px;border-radius:50%;background:#00A6A6;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500}
 .ch b{font-weight:500;font-size:14px}
-.ch .rt{display:flex;gap:4px}
-.ch .rt button{background:none;border:none;cursor:pointer;color:#909399;padding:4px;border-radius:4px}
-.ch .rt button:hover{background:#F5F7FA;color:#00A6A6}
+.winctl{position:absolute;top:8px;right:10px;display:flex;gap:3px;z-index:3}
+.winctl button{width:30px;height:30px;display:flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;color:#606266;border-radius:4px;font-size:17px;line-height:1;font-family:inherit}
+.winctl button:hover{background:#E9EEF4;color:#00A6A6}
 .msgs{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;background:#FAFBFC}
 .bub{max-width:82%;padding:9px 12px;border-radius:10px;line-height:1.55;font-size:13px;word-break:break-word}
 .bub.u{align-self:flex-end;background:#00A6A6;color:#fff;border-bottom-right-radius:2px}
@@ -192,10 +162,10 @@ html,body{margin:0;padding:0;font-family:-apple-system,"PingFang SC","Microsoft 
 .bub.b .md-img{max-width:100%;border-radius:6px;margin:6px 0;display:block;cursor:zoom-in;border:0.5px solid #E4E7ED}
 .bub.b a{color:#00A6A6;word-break:break-all}
 @keyframes blink{0%,60%,100%{opacity:0.25}30%{opacity:1}}
-.inr{padding:10px 12px;border-top:0.5px solid #E4E7ED;display:flex;gap:8px;background:#fff;align-items:center}
-.inr input{flex:1;height:32px;border:0.5px solid #DCDFE6;border-radius:6px;padding:0 10px;outline:none;font-size:13px;font-family:inherit;color:#303133}
-.inr input:focus{border-color:#00A6A6}
-.inr .sb{height:32px;padding:0 16px;background:#00A6A6;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-family:inherit}
+.inr{position:relative;padding:12px;border-top:0.5px solid #E4E7ED;background:#fff}
+.inr textarea{display:block;width:100%;height:128px;border:0.5px solid #DCDFE6;border-radius:8px;padding:14px 82px 14px 14px;outline:none;resize:none;line-height:1.6;font-size:14px;font-family:inherit;color:#303133}
+.inr textarea:focus{border-color:#00A6A6}
+.inr .sb{position:absolute;right:24px;bottom:24px;height:38px;padding:0 14px;background:#00A6A6;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-family:inherit}
 .inr .sb:hover{background:#008C8C}
 .ov{position:fixed;inset:0;background:rgba(31,45,64,.5);display:none;align-items:center;justify-content:center;z-index:99}
 .ov.on{display:flex}
@@ -413,14 +383,18 @@ html,body{margin:0;padding:0;font-family:-apple-system,"PingFang SC","Microsoft 
   <span class="cnt" id="cnt">0</span>
 </button>
 <div class="chat" id="chat">
+  <div class="winctl">
+    <button id="minbtn" onclick="minimizeChat()" title="最小化" aria-label="最小化">—</button>
+    <button id="maxbtn" onclick="toggleMaxChat()" title="最大化" aria-label="最大化" aria-pressed="false">⛶</button>
+    <button onclick="closeChat()" title="关闭" aria-label="关闭">✕</button>
+  </div>
   <div class="cm">
     <div class="ch">
       <div class="lt"><div class="av">AI</div><b>智能助理</b><span class="online wait" id="aistat">连接中</span></div>
-      <div class="rt"><button onclick="toggleChat()" title="关闭">✕</button></div>
     </div>
     <div class="msgs" id="msgs"></div>
     <div class="tkrow"><button class="tkb" onclick="chatTicket()">一键转工单</button><button class="nw" onclick="newChat()">创建新对话窗口</button><span class="hint">将提取全部对话内容作为工单描述</span></div>
-    <div class="inr"><input id="inp" placeholder="请输入你的问题…" onkeydown="if(event.key==='Enter')send()"><button class="sb" onclick="send()">发送</button></div>
+    <div class="inr"><textarea id="inp" rows="4" placeholder="请输入你的问题…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}"></textarea><button class="sb" onclick="send()">发送</button></div>
   </div>
   <div class="rside">
     <div class="rs-sec">
@@ -435,7 +409,6 @@ html,body{margin:0;padding:0;font-family:-apple-system,"PingFang SC","Microsoft 
       <div class="rs-t">常见问题</div>
       <div class="faq" id="faqbox"></div>
     </div>
-    <button class="cfgbtn" onclick="openCfg()">⚙ 配置中台</button>
     <div class="rf">操作手册 · <span onclick="manualGo()">进入帮助中心 ›</span></div>
   </div>
 </div>
@@ -477,6 +450,10 @@ function goPage(b){document.querySelectorAll('.pg').forEach(function(x){x.classL
 var seq=0;
 var hist=[];var sess=null;var aiOK=false;
 function toggleChat(){var c=document.getElementById('chat');c.classList.toggle('on');if(c.classList.contains('on')&&!seq){addB('你好，我是中通冷链的智能助理。可以问我订单查询、异常处理、操作指引等问题，遇到无法解决的也可以点「一键转工单」转人工。')}}
+function setMaxButton(on){var b=document.getElementById('maxbtn');var label=on?'还原':'最大化';b.title=label;b.setAttribute('aria-label',label);b.setAttribute('aria-pressed',on?'true':'false')}
+function toggleMaxChat(){var c=document.getElementById('chat');setMaxButton(c.classList.toggle('max'))}
+function minimizeChat(){document.getElementById('chat').classList.remove('on')}
+function closeChat(){var c=document.getElementById('chat');c.classList.remove('on','max');setMaxButton(false)}
 function newChat(){var m=document.getElementById('msgs');m.innerHTML='';hist=[];sess=null;addB('你好，我是中通冷链的智能助理。这是新的对话窗口，可以问我订单查询、异常处理、操作指引等问题。');toast('已清除历史对话，创建新对话窗口')}
 function addU(t){var m=document.getElementById('msgs');var d=document.createElement('div');d.className='bub u';d.textContent=t;m.appendChild(d);m.scrollTop=m.scrollHeight;return d}
 function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
@@ -502,16 +479,22 @@ function mdToHtml(t){
   return t;
 }
 function addB(t){var m=document.getElementById('msgs');var d=document.createElement('div');d.className='bub b';d.innerHTML=mdToHtml(t);m.appendChild(d);var a=document.createElement('div');a.className='acts';a.innerHTML='<button onclick="useful(this)">👍 有用</button>';m.appendChild(a);m.scrollTop=m.scrollHeight;return d}
+function finishBub(d,t){t.className='bub b';t.innerHTML=mdToHtml(d);var a=document.createElement('div');a.className='acts';a.innerHTML='<button onclick="useful(this)">👍 有用</button>';t.parentNode.insertBefore(a,t.nextSibling);t.parentNode.scrollTop=t.parentNode.scrollHeight}
 function useful(b){b.parentNode.innerHTML='<span class="ok">感谢反馈</span>';b.parentNode.previousElementSibling.style.background='#F0F9EB';b.parentNode.previousElementSibling.style.borderColor='#C2E7B0'}
 function send(){var i=document.getElementById('inp');var q=i.value.trim();if(!q)return;i.value='';addU(q);askAI(q)}
 function addTyping(){var m=document.getElementById('msgs');var d=document.createElement('div');d.className='bub b think';d.innerHTML='正在思考<span class="dots"><i></i><i></i><i></i></span>';m.appendChild(d);m.scrollTop=m.scrollHeight;return d}
+function readSSE(r,onEvent){return new Promise(function(resolve,reject){if(!r.body){reject(new Error('浏览器不支持流式响应'));return}var rd=r.body.getReader(),dec=new TextDecoder(),buf='';function emit(block){var ls=block.split(/\r?\n/),ev='message',ds=[];ls.forEach(function(x){if(x.indexOf('event:')===0)ev=x.slice(6).trim();else if(x.indexOf('data:')===0)ds.push(x.slice(5).trim())});if(!ds.length)return;var raw=ds.join('\n');if(raw==='[DONE]'){onEvent('done',{});return}try{onEvent(ev,JSON.parse(raw))}catch(e){reject(e)}}function pump(){rd.read().then(function(x){buf+=dec.decode(x.value||new Uint8Array(),{stream:!x.done});var p;while((p=buf.indexOf('\n\n'))!==-1){emit(buf.slice(0,p));buf=buf.slice(p+2)}if(x.done){if(buf.trim())emit(buf);resolve()}else pump()}).catch(reject)}pump()})}
 function askAI(q,fb){
 hist.push({role:'user',content:q});
 var tp=addTyping();
-fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:hist,session_id:sess,prompt:q})}).then(function(r){return r.json()}).then(function(d){
-tp.remove();
-if(d.success&&d.reply){sess=d.session_id||sess;hist.push({role:'assistant',content:d.reply});aiOK=true;setStat('百炼已连接');addB(d.reply)}
-else{hist.pop();if(d.error)toast('AI 服务提示：'+d.error);fallback(fb,q)}
+var answer='';
+fetch('/api/chat/stream',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:hist,session_id:sess,prompt:q})}).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return readSSE(r,function(ev,d){
+if(ev==='chunk'&&d.text){answer+=d.text;tp.className='bub b';tp.innerHTML=mdToHtml(answer);tp.parentNode.scrollTop=tp.parentNode.scrollHeight}
+if(ev==='done'&&d.session_id)sess=d.session_id;
+if(ev==='error')throw new Error(d.error||'流式请求失败');
+})}).then(function(){
+if(answer){hist.push({role:'assistant',content:answer});aiOK=true;setStat('百炼已连接');finishBub(answer,tp)}
+else{tp.remove();hist.pop();fallback(fb,q)}
 }).catch(function(){tp.remove();hist.pop();fallback(fb,q)});
 }
 function fallback(fb,q){addB(fb||('已收到你的问题「'+q+'」。当前为离线演示模式，我可以帮你：1) 查看订单详情；2) 查询提货进度；3) 处理温度异常。需要转人工可点输入框上方的「一键转工单」。'))}
@@ -522,9 +505,8 @@ if(!arr.length){toast('暂无对话内容可提取');return}
 createTicket('对话反馈',arr.join('\n'));toast('已生成工单，全部对话内容已作为描述带入')}
 var FAQ={'如何查询订单提货进度？':'可在「订单管理」中搜索订单编号查看运单状态，或点击运单行「详情」查看实时轨迹。','温度异常怎么处理？':'系统检测到超温会触发预警（如页面顶部黄色条）。建议立即联系司机调温；若已影响品质可按 SOP 走理赔，也可点「一键转工单」转人工协助。','PDA 无法登录怎么办？':'先检查网络与账号权限；仍无法登录可在右侧「下载汇总」重装 PDA 最新版，或联系今日在岗技术支持（李勇/乔羽/韩刚）。','如何申请退单？':'在「订单管理」勾选对应订单后点击上方「退单」，状态变为待确认后由财务审核，可在「退单工单」标签查看进度。','签收异常如何操作？':'在运单「详情」中标记异常签收原因（拒收/部分签收等），系统会生成异常工单进入「异常工单」列表，由网点核实处理。'};
 function faqGo(q,a){addU(q);askAI(q,a||FAQ[q]||'已收到你的问题，正在查询中…')}
-function dlGoBy(i){var x=SIDEBAR.downloads[i];if(!x)return;if(x.url){var a=document.createElement('a');a.href=x.url;a.target='_blank';a.rel='noopener';document.body.appendChild(a);a.click();a.remove();toast('正在打开/下载：'+x.name)}else{toast('「'+x.name+'」尚未配置下载链接，请到 ⚙ 配置中台填写')}}
+function dlGoBy(i){var x=SIDEBAR.downloads[i];if(!x)return;if(x.url){var a=document.createElement('a');a.href=x.url;a.target='_blank';a.rel='noopener';document.body.appendChild(a);a.click();a.remove();toast('正在打开/下载：'+x.name)}else{toast('「'+x.name+'」尚未配置下载链接，请联系管理员填写')}}
 function faqGoBy(i){var x=SIDEBAR.faq[i];if(x)faqGo(x.q,x.a)}
-/* ================= 配置中台 ================= */
 var DEFAULT_SIDEBAR={
   onDuty:{byDate:{},byWeekday:{
     '周一':['李勇','乔羽','韩刚'],
@@ -576,7 +558,7 @@ function renderSidebar(){
       return '<div class="st"><div class="av" style="background:'+cols[i%cols.length]+'">'+nm.charAt(0)+'</div>'+nm+'<span class="dot"></span></div>';
     }).join('');
   }else{
-    sbx.innerHTML='<div class="cfempty">今日暂无值班安排<br>到 ⚙ 配置中台导入值班表</div>';
+    sbx.innerHTML='<div class="cfempty">今日暂无值班安排<br>请联系管理员配置值班表</div>';
   }
   var dlb=document.getElementById('dlbox');
   if(sb.downloads&&sb.downloads.length){
@@ -584,13 +566,13 @@ function renderSidebar(){
       var nm=escHtml(x.name||('下载项'+(i+1)));
       return '<button onclick="dlGoBy('+i+')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#00A6A6" stroke-width="2"><path d="M12 4v11m0 0l-4-4m4 4l4-4M5 19h14"/></svg>'+nm+'</button>';
     }).join('');
-  }else dlb.innerHTML='<div class="cfempty">暂无下载项<br>到 ⚙ 配置中台添加</div>';
+  }else dlb.innerHTML='<div class="cfempty">暂无下载项<br>请联系管理员配置</div>';
   var fqb=document.getElementById('faqbox');
   if(sb.faq&&sb.faq.length){
     fqb.innerHTML=sb.faq.map(function(x,i){
       return '<button onclick="faqGoBy('+i+')">'+escHtml(x.q||('问题'+(i+1)))+'</button>';
     }).join('');
-  }else fqb.innerHTML='<div class="cfempty">暂无常见问题<br>到 ⚙ 配置中台添加</div>';
+  }else fqb.innerHTML='<div class="cfempty">暂无常见问题<br>请联系管理员配置</div>';
 }
 function loadSidebar(){
   fetch('/api/sidebar').then(function(r){return r.json()}).then(function(d){
@@ -601,166 +583,6 @@ function loadSidebar(){
     renderSidebar();
   });
 }
-/* ---- 配置弹窗 ---- */
-function openCfg(){
-  var sb=SIDEBAR;
-  var txt=[];
-  var bw=sb.onDuty.byWeekday||{},bd=sb.onDuty.byDate||{};
-  WEEK_CN.slice(1).concat(['周日']).forEach(function(w){if(bw[w]&&bw[w].length)txt.push(w+'：'+bw[w].join(','))});
-  Object.keys(bd).sort().forEach(function(d){if(bd[d].length)txt.push(d+'：'+bd[d].join(','))});
-  document.getElementById('dutytext').value=txt.join('\n');
-  var dlb=document.getElementById('dllist');dlb.innerHTML='';
-  (sb.downloads||[]).forEach(function(x){addDlRow(x)});
-  if(!(sb.downloads||[]).length)addDlRow();
-  var fqb=document.getElementById('faqlist');fqb.innerHTML='';
-  (sb.faq||[]).forEach(function(x){addFaqRow(x)});
-  if(!(sb.faq||[]).length)addFaqRow();
-  parseDuty();
-  document.getElementById('cfgov').classList.add('on');
-}
-function closeCfg(){document.getElementById('cfgov').classList.remove('on')}
-function cfgTab(t){
-  var tabs=document.querySelectorAll('.cftabs button');
-  for(var i=0;i<tabs.length;i++)tabs[i].className=tabs[i].getAttribute('data-t')===t?'on':'';
-  ['duty','dl','faq'].forEach(function(k){document.getElementById('tab-'+k).style.display=k===t?'':'none'});
-}
-/* ---- 值班表解析：支持「周X：人名」/「日期：人名」/ Excel 粘贴 / JSON ---- */
-function parseDutyText(text){
-  var byDate={},byWeekday={};
-  var t=(text||'').trim();
-  if(!t)return {byDate:byDate,byWeekday:byWeekday};
-  if(t.charAt(0)==='{'){
-    try{var j=JSON.parse(t);if(j.byDate)byDate=j.byDate;if(j.byWeekday)byWeekday=j.byWeekday;return {byDate:byDate,byWeekday:byWeekday};}catch(e){}
-  }
-  t.split(/\r?\n/).forEach(function(line){
-    if(!line.trim())return;
-    var m=line.match(/^\s*([^：:]+)\s*[：:]\s*(.+)$/),key,val;
-    if(m){key=m[1].trim();val=m[2];}
-    else{
-      var parts=line.split(/[\t\s]+/).filter(Boolean);
-      if(parts.length>=2){key=parts[0];val=parts.slice(1).join(',');}
-      else return;
-    }
-    if(!key||!val)return;
-    var names=val.split(/[,，、;；\s]+/).filter(Boolean);
-    if(!names.length)return;
-    if(/^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/.test(key)){
-      var dm=key.replace(/\//g,'-').match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-      byDate[dm[1]+'-'+('0'+dm[2]).slice(-2)+'-'+('0'+dm[3]).slice(-2)]=names;
-    }else{
-      var wk=key.replace('星期','周').replace('礼拜','周').replace('周天','周日');
-      byWeekday[wk]=names;
-    }
-  });
-  return {byDate:byDate,byWeekday:byWeekday};
-}
-function parseDuty(){
-  var r=parseDutyText(document.getElementById('dutytext').value);
-  var t=todayDuty({onDuty:r});
-  var el=document.getElementById('dutynow');
-  el.innerHTML=t.staff.length
-    ? escHtml(t.staff.join('、'))+' <span class="tag">'+t.weekday+' '+t.date+'</span>'
-    : '（今日 '+t.weekday+' '+t.date+' 无匹配值班）';
-  document.getElementById('dutytext').setAttribute('data-ok',t.staff.length?'1':'0');
-}
-/* ---- 下载 / FAQ 动态行 ---- */
-function addDlRow(x){
-  x=x||{};
-  var row=document.createElement('div');row.className='dynrow';
-  row.innerHTML='<span class="dlabel dl2">名称</span><input class="nm" placeholder="如：PDA下载" value="'+escHtml(x.name||'')+'"><span class="dlabel">链接</span><input class="ur" placeholder="https://…（留空则不可点）" value="'+escHtml(x.url||'')+'"><button onclick="this.parentNode.remove()">✕</button>';
-  document.getElementById('dllist').appendChild(row);
-}
-function addFaqRow(x){
-  x=x||{};
-  var row=document.createElement('div');row.className='dynrow';
-  row.innerHTML='<span class="dlabel dl2">问题</span><input class="q" placeholder="如：如何查询订单提货进度？" value="'+escHtml(x.q||'')+'"><span class="dlabel">答案</span><input class="a" placeholder="点击后回复内容（留空走 AI）" value="'+escHtml(x.a||'')+'"><button onclick="this.parentNode.remove()">✕</button>';
-  document.getElementById('faqlist').appendChild(row);
-}
-/* ---- 保存 ---- */
-function collectCfg(){
-  var r=parseDutyText(document.getElementById('dutytext').value);
-  var dls=[],drows=document.querySelectorAll('#dllist .dynrow');
-  for(var i=0;i<drows.length;i++){
-    var nm=drows[i].querySelector('.nm').value.trim(),ur=drows[i].querySelector('.ur').value.trim();
-    if(nm)dls.push({name:nm,url:ur});
-  }
-  var fqs=[],frows=document.querySelectorAll('#faqlist .dynrow');
-  for(var j=0;j<frows.length;j++){
-    var q=frows[j].querySelector('.q').value.trim(),a=frows[j].querySelector('.a').value.trim();
-    if(q)fqs.push({q:q,a:a});
-  }
-  return {onDuty:r,downloads:dls,faq:fqs};
-}
-function saveSidebar(){
-  var cfg=collectCfg();
-  fetch('/api/sidebar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({config:cfg})})
-    .then(function(r){return r.json()}).then(function(d){
-      if(d.success){SIDEBAR=mergeSidebar(d.config);renderSidebar();closeCfg();toast('配置已保存并生效');}
-      else toast('保存失败：'+(d.error||'未知错误'));
-    }).catch(function(){
-      try{localStorage.setItem('zt_sidebar',JSON.stringify(cfg));}catch(e){}
-      SIDEBAR=mergeSidebar(cfg);renderSidebar();closeCfg();toast('已保存到本地（代理未连接，重启后仍有效）');
-    });
-}
-/* ---- 值班表 Excel 导入 ---- */
-function importExcel(){document.getElementById('excelfile').click()}
-function onExcelFile(inp){
-  var f=inp.files[0];inp.value='';
-  if(!f)return;
-  if(!/\.(xlsx|xls)$/i.test(f.name)){toast('仅支持 .xlsx / .xls 格式');return}
-  if(f.size>8*1024*1024){toast('文件过大（限 8MB）');return}
-  var rd=new FileReader();
-  rd.onload=function(){
-    var b64=(rd.result||'').split(',')[1]||'';
-    toast('正在解析值班表…');
-    fetch('/api/sidebar/import-excel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filename:f.name,base64:b64})})
-      .then(function(r){return r.json()}).then(function(d){
-        if(!d.ok){toast('解析失败：'+(d.error||'未知错误'));return}
-        showImportPreview(d);
-      }).catch(function(){toast('导入失败：代理服务未连接')});
-  };
-  rd.readAsDataURL(f);
-}
-function cnWeek(ds){
-  return '周'+'日一二三四五六'[new Date(ds).getDay()];
-}
-function showImportPreview(d){
-  var m=d.meta,od=d.onDuty;
-  var today=todayStr();
-  var wk=cnWeek(today);
-  var staff=(od.byDate[today]||od.byWeekday[wk]||od.byWeekday['星期'+wk.slice(1)]||[]).join('、')||'（无）';
-  var el=document.getElementById('importprev');
-  el.style.display='block';
-  el.innerHTML='<div class="ip-t">📋 解析成功（'+escHtml(d.usedSheet||'工作表')+'）</div>'+
-    '<div>识别到 <b>'+m.staffCount+'</b> 名员工（'+escHtml(m.staff.join('、'))+'），排班记录 <b>'+m.records+'</b> 条（含休息 '+m.restRecords+' 条），覆盖 <b>'+m.dateFrom+' ~ '+m.dateTo+'</b>，共 '+m.dutyDates+' 个在岗日。</div>'+
-    '<div>📅 今日（'+today+' '+cnWeek(today)+'）值班：<b>'+escHtml(staff)+'</b></div>'+
-    '<div class="ip-row"><button class="ip-ok" onclick="applyImport()">✓ 应用并保存</button><button class="ip-no" onclick="cancelImport()">取消</button></div>';
-  window._impDuty=od;
-}
-function cancelImport(){document.getElementById('importprev').style.display='none';window._impDuty=null}
-function applyImport(){
-  var od=window._impDuty;if(!od)return;
-  var cur=parseDutyText(document.getElementById('dutytext').value);
-  // 归一化 Excel 的 byWeekday 键（星期一→周一）并覆盖同名旧键
-  var exc=od.byWeekday||{},norm={};
-  Object.keys(exc).forEach(function(k){
-    var nk=k.replace('星期','周').replace('礼拜','周').replace('周天','周日');
-    norm[nk]=exc[k];
-  });
-  var merged={byDate:Object.assign({},cur.byDate,od.byDate),byWeekday:Object.assign({},cur.byWeekday,norm)};
-  document.getElementById('dutytext').value=Object.keys(merged.byDate).sort().map(function(k){return k+'：'+merged.byDate[k].join(',')}).join('\n');
-  var cfg=collectCfg();cfg.onDuty=merged;
-  fetch('/api/sidebar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({config:cfg})})
-    .then(function(r){return r.json()}).then(function(d){
-      if(d.success){SIDEBAR=mergeSidebar(d.config);renderSidebar();closeCfg();toast('值班表已导入并生效');}
-      else toast('保存失败：'+(d.error||'未知错误'));
-    }).catch(function(){
-      try{localStorage.setItem('zt_sidebar',JSON.stringify(cfg));}catch(e){}
-      SIDEBAR=mergeSidebar(cfg);renderSidebar();closeCfg();toast('已保存到本地（代理未连接，重启后仍有效）');
-    });
-  window._impDuty=null;
-}
-function todayStr(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0')}
 loadSidebar();
 function createTicket(src,desc){seq++;var id='GD-20260828-'+String(seq).padStart(3,'0');var box=document.getElementById('tkbox');var list=document.getElementById('tklist');box.classList.add('on');var d=document.createElement('div');d.className='ti';d.innerHTML='<span class="id">'+id+'</span><span class="src">['+src+']</span><span class="ds" title="'+desc.replace(/"/g,'')+'">'+desc+'</span>';list.appendChild(d);document.getElementById('tkcount').textContent=seq+' 条';var cnt=document.getElementById('cnt');cnt.textContent=seq;cnt.classList.add('on');return id}
 function toast(t){var e=document.getElementById('toast');e.textContent=t;e.classList.add('on');setTimeout(function(){e.classList.remove('on')},2200)}
@@ -794,36 +616,5 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')closeImg()})
   </div>
   <div class="imgstage"><img id="imgview" alt="图片预览"></div>
 </div>
-<div class="ov" id="cfgov" onclick="if(event.target===this)closeCfg()"><div class="ovp cfgp">
-  <h3>⚙ 配置中台</h3>
-  <div class="cftabs">
-    <button class="on" data-t="duty" onclick="cfgTab('duty')">值班表</button>
-    <button data-t="dl" onclick="cfgTab('dl')">下载汇总</button>
-    <button data-t="faq" onclick="cfgTab('faq')">常见问题</button>
-  </div>
-  <div class="cftab" id="tab-duty">
-    <p class="cftip">粘贴值班表，每行一条：<b>「周一：李勇,乔羽」</b>（按星期）或 <b>「2026-08-31：王五,赵六」</b>（按日期，优先于星期）。也可以直接粘贴 Excel 复制的内容（第一列日期/星期，其余列姓名），或整段 JSON。</p>
-    <div class="cfrow"><button class="mini imp" onclick="importExcel()">📥 导入 Excel 值班表</button><span class="cfhint">支持 .xlsx / .xls，自动识别「排班主数据」「员工全月排班」表</span></div>
-    <input type="file" id="excelfile" accept=".xlsx,.xls" style="display:none" onchange="onExcelFile(this)">
-    <textarea id="dutytext" rows="6" placeholder="周一：李勇,乔羽,韩刚&#10;周二：张三,李四&#10;2026-08-31：王五,赵六&#10;…"></textarea>
-    <div class="cfrow"><span>今日值班预览：</span><b id="dutynow">（尚未解析）</b></div>
-    <div class="cfrow" style="margin-top:2px"><button class="mini" onclick="parseDuty()">解析预览</button></div>
-    <div id="importprev" style="display:none"></div>
-  </div>
-  <div class="cftab" id="tab-dl" style="display:none">
-    <p class="cftip">配置下载项：名称 + 真实文件链接（http/https），点击侧边栏按钮即打开/下载。链接留空则暂不可点。</p>
-    <div id="dllist"></div>
-    <button class="mini" onclick="addDlRow()">+ 添加下载项</button>
-  </div>
-  <div class="cftab" id="tab-faq" style="display:none">
-    <p class="cftip">配置常见问题：问题 + 答案。点击侧边栏问题按钮时自动带入对话，回复内容取自答案（未配置答案时走 AI 生成）。</p>
-    <div id="faqlist"></div>
-    <button class="mini" onclick="addFaqRow()">+ 添加常见问题</button>
-  </div>
-  <div class="rw">
-    <button class="b" onclick="closeCfg()">取消</button>
-    <button class="b pri" onclick="saveSidebar()">保存配置</button>
-  </div>
-</div></div>
 </body>
 </html>

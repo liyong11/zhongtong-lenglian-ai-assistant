@@ -4,16 +4,18 @@ bailian-proxy/config.json
 # 运行时日志
 bailian-proxy/*.log
 
-# Excel 临时导入文件
-bailian-proxy/*.tmp-import-*.xlsx
 
 # 工作区内部数据
 .workbuddy/
 
 # 构建产物与中间文件
+dist/
 output/
 __pycache__/
 *.pyc
 node_modules/
+.codegraph/
+bailian-proxy/*.tmp
+bailian-proxy/*.corrupt-*
 .DS_Store
 Thumbs.db
