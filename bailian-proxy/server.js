@@ -184,16 +184,26 @@ async function callAppStream(cfg, prompt, sessionId, res) {
   const url = 'https://dashscope.aliyuncs.com/api/v1/apps/' + encodeURIComponent(cfg.appId) + '/completion';
   const input = { prompt: prompt };
   if (sessionId) input.session_id = sessionId;
-  const resp = await fetch(url, {
+  const post = (parameters) => fetch(url, {
     method: 'POST',
     headers: {
       'Authorization': 'Bearer ' + cfg.apiKey,
       'Content-Type': 'application/json',
       'X-DashScope-SSE': 'enable'
     },
-    body: JSON.stringify({ input: input, parameters: { incremental_output: true } })
+    body: JSON.stringify({ input: input, parameters: parameters })
   });
-  if (!resp.ok) throw new Error(mapErr(resp.status, await resp.json()));
+  // has_thoughts 请求返回思考过程；少数旧应用不支持该参数时会报 InvalidParameter，去掉后重试一次
+  let resp = await post({ incremental_output: true, has_thoughts: true });
+  if (!resp.ok) {
+    const errData = await resp.json();
+    if (/has_thoughts|InvalidParameter/i.test(String(errData.code || '') + String(errData.message || ''))) {
+      resp = await post({ incremental_output: true });
+      if (!resp.ok) throw new Error(mapErr(resp.status, await resp.json()));
+    } else {
+      throw new Error(mapErr(resp.status, errData));
+    }
+  }
 
   // 用 stream 模式做流式 UTF-8 解码：中文等多字节字符被 TCP 分包切开时，
   // 逐 chunk toString('utf8') 会把切开的字节替换成 � 甚至弄坏 JSON 导致整块被丢。
@@ -205,6 +215,7 @@ async function callAppStream(cfg, prompt, sessionId, res) {
   let chunkCount = 0;
   let charCount = 0;
   let finishReason = '';
+  let sentThought = '';
   let clientGone = false;
   res.on('close', () => {
     if (!res.writableEnded) {
@@ -227,6 +238,17 @@ async function callAppStream(cfg, prompt, sessionId, res) {
     if (out.session_id) currentSession = out.session_id;
     if (parsed.data.usage) usage = parsed.data.usage;
     if (out.finish_reason) finishReason = out.finish_reason;
+    // 思考过程：thoughts 可能整段重发也可能增量，按前缀对齐后只发增量，对不齐则整段替换
+    const thoughts = Array.isArray(out.thoughts) ? out.thoughts.map((t) => (t && t.thought) || '').join('') : '';
+    if (thoughts) {
+      if (thoughts.startsWith(sentThought)) {
+        const suffix = thoughts.slice(sentThought.length);
+        if (suffix) { writeSse(res, 'thought', { text: suffix }); sentThought = thoughts; }
+      } else {
+        writeSse(res, 'thought', { text: thoughts, replace: true });
+        sentThought = thoughts;
+      }
+    }
     if (text) {
       writeSse(res, 'chunk', { text: text, session_id: currentSession });
       chunkCount++;
@@ -277,21 +299,36 @@ async function callModel(cfg, messages) {
   };
 }
 
-// 模型直调的流式版本：OpenAI 兼容接口 stream:true，SSE 块格式 data: {"choices":[{"delta":{"content":…}}]}
+// 模型直调的流式版本：OpenAI 兼容接口 stream:true；思考模型（qwen3 等）额外请求
+// enable_thinking 并转发 delta.reasoning_content，不支持的模型报错时去掉该参数重试
 async function callModelStream(cfg, messages, res) {
   const url = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
   const msgs = cfg.systemPrompt
     ? [{ role: 'system', content: cfg.systemPrompt }].concat(messages)
     : messages;
-  const resp = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Authorization': 'Bearer ' + cfg.apiKey,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ model: cfg.model, messages: msgs, stream: true })
-  });
-  if (!resp.ok) throw new Error(mapErr(resp.status, await resp.json()));
+  const post = (withThinking) => {
+    const body = withThinking
+      ? { model: cfg.model, messages: msgs, stream: true, enable_thinking: true }
+      : { model: cfg.model, messages: msgs, stream: true };
+    return fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + cfg.apiKey,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+  };
+  let resp = await post(true);
+  if (!resp.ok) {
+    const errData = await resp.json();
+    if (/enable_thinking|InvalidParameter/i.test(String(errData.code || '') + String(errData.message || ''))) {
+      resp = await post(false);
+      if (!resp.ok) throw new Error(mapErr(resp.status, await resp.json()));
+    } else {
+      throw new Error(mapErr(resp.status, errData));
+    }
+  }
 
   const decoder = new TextDecoder('utf-8');
   let buffer = '';
@@ -313,6 +350,8 @@ async function callModelStream(cfg, messages, res) {
     if (parsed.done || !parsed.data) return;
     if (parsed.data.usage) usage = parsed.data.usage;
     const choice = (parsed.data.choices && parsed.data.choices[0]) || {};
+    const reasoning = (choice.delta && choice.delta.reasoning_content) || '';
+    if (reasoning) writeSse(res, 'thought', { text: reasoning });
     const text = (choice.delta && choice.delta.content) || '';
     if (text) {
       writeSse(res, 'chunk', { text: text, session_id: null });

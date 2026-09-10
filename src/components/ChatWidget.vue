@@ -114,7 +114,7 @@ async function send(question = input.value) {
   const history = messages.value
     .filter(message => message.content && (message.role === 'user' || message.role === 'assistant'))
     .map(message => ({ role: message.role, content: message.content }))
-  const answer = { role: 'assistant', content: '', displayContent: '', pending: true, done: false, animationId: 0 }
+  const answer = { role: 'assistant', content: '', displayContent: '', pending: true, done: false, animationId: 0, thought: '', thoughtOpen: false }
   messages.value.push(answer)
   startAnswerAnimation(answer)
   loading.value = true
@@ -129,9 +129,14 @@ async function send(question = input.value) {
     if (!response.ok || !response.body) throw new Error(`服务请求失败（${response.status}）`)
     let streamError = ''
     await consumeSseStream(response.body, async ({ event, data }) => {
+      if (event === 'thought') {
+        answer.thought = data.replace ? (data.text || '') : answer.thought + (data.text || '')
+        if (!answer.content) answer.thoughtOpen = true
+      }
       if (event === 'chunk') {
         answer.content += chunkText(data)
         if (data.session_id) sessionId.value = data.session_id
+        if (answer.thoughtOpen) answer.thoughtOpen = false
       }
       if (event === 'done' && data.session_id) sessionId.value = data.session_id
       if (event === 'error') streamError = data.error || 'AI 服务异常'
@@ -244,8 +249,17 @@ onUnmounted(() => clearInterval(clockTimer))
             <div v-for="(message, index) in messages" :key="index" class="message" :class="message.role">
               <span class="message-avatar">{{ message.role === 'assistant' ? 'AI' : '我' }}</span>
               <div class="message-bubble" :class="{ streaming: message.pending }">
+                <div v-if="message.role === 'assistant' && message.thought" class="thought-panel" :class="{ open: message.thoughtOpen }">
+                  <button type="button" class="thought-head" :aria-expanded="message.thoughtOpen" @click="message.thoughtOpen = !message.thoughtOpen">
+                    <span class="thought-mark">✻</span>
+                    <span>深度思考</span>
+                    <i v-if="message.pending && message.thoughtOpen && !message.content" class="thought-live" aria-label="思考中" />
+                    <span class="thought-chevron" aria-hidden="true">{{ message.thoughtOpen ? '︿' : '﹀' }}</span>
+                  </button>
+                  <div v-show="message.thoughtOpen" class="thought-body">{{ message.thought }}</div>
+                </div>
                 <div class="message-markdown" v-html="renderMessage(message.displayContent ?? message.content)" />
-                <span v-if="message.pending && !message.displayContent" class="typing" aria-label="正在生成回复"><i></i><i></i><i></i></span>
+                <span v-if="message.pending && !message.displayContent && !message.thought" class="typing" aria-label="正在生成回复"><i></i><i></i><i></i></span>
                 <span v-else-if="message.pending" class="stream-cursor" aria-hidden="true"></span>
               </div>
             </div>
