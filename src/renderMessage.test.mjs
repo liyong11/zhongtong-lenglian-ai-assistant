@@ -23,3 +23,14 @@ test('keeps footnote definition text while dropping the marker', () => {
   assert.match(html, /中通冷链操作手册/)
   assert.doesNotMatch(html, /\[\^/)
 })
+
+test('markdown 和裸链接均渲染为可点击的新标签页链接', () => {
+  const html = renderMessage('[操作手册](https://example.com/manual)\n\n详情见 https://example.com/faq')
+  assert.match(html, /<a href="https:\/\/example.com\/manual" target="_blank" rel="noopener noreferrer">操作手册<\/a>/)
+  assert.match(html, /<a href="https:\/\/example.com\/faq" target="_blank" rel="noopener noreferrer">/)
+})
+
+test('全角括号的伪 markdown 链接会被归一并渲染为链接', () => {
+  const html = renderMessage('请看[下载页面]（https://example.com/dl）')
+  assert.match(html, /<a href="https:\/\/example.com\/dl" target="_blank" rel="noopener noreferrer">下载页面<\/a>/)
+})
