@@ -215,7 +215,7 @@ onMounted(async () => {
               <span>机器人头像（上传 / 图片 URL / 文字表情）</span>
               <div class="image-field-row">
                 <input v-model="sidebar.brand.avatar" placeholder="https://…/logo.png 或 🐧、小冷">
-                <button class="upload-btn" type="button" :disabled="uploading" @click="pickImage('avatar')">
+                <button class="upload-btn" type="button" :disabled="!!uploading" @click="pickImage('avatar')">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg>
                   {{ uploading === 'avatar' ? '上传中…' : '上传图片' }}
                 </button>
@@ -225,14 +225,14 @@ onMounted(async () => {
               <span>悬浮按钮图片（上传 / 图片 URL / 文字表情）</span>
               <div class="image-field-row">
                 <input v-model="sidebar.brand.launcher" placeholder="留空沿用机器人头像">
-                <button class="upload-btn" type="button" :disabled="uploading" @click="pickImage('launcher')">
+                <button class="upload-btn" type="button" :disabled="!!uploading" @click="pickImage('launcher')">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg>
                   {{ uploading === 'launcher' ? '上传中…' : '上传图片' }}
                 </button>
               </div>
             </div>
           </div>
-          <input ref="fileInput" type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden @change="uploadImage">
+          <input ref="fileInput" class="file-input-hidden" type="file" accept="image/png,image/jpeg,image/gif,image/webp" @change="uploadImage">
           <div class="brand-preview">
             <span class="brand-preview-avatar brand-preview-launcher" :title="launcherIsImage ? '悬浮按钮' : ''"><img v-if="launcherIsImage" :src="sidebar.brand.launcher.trim()" alt="悬浮按钮预览">{{ launcherIsImage ? '' : launcherText }}</span>
             <span class="brand-preview-avatar"><img v-if="avatarIsImage" :src="sidebar.brand.avatar.trim()" alt="头像预览">{{ avatarIsImage ? '' : avatarText }}</span>

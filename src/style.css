@@ -240,6 +240,8 @@ a.staff-ding:hover{background:#d1fae5;color:#065f46}
 .upload-btn svg{width:15px;height:15px}
 .upload-btn:hover:not(:disabled){border-color:var(--primary);color:var(--primary);background:rgba(15,159,149,.06)}
 .upload-btn:disabled{opacity:.55;cursor:default}
+/* 不用 hidden/display:none：Safari 会忽略对未渲染 file input 的程序化 click，上传按钮就点不动 */
+.file-input-hidden{position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0}
 .brand-preview-launcher{border-radius:50%;box-shadow:0 6px 16px rgba(8,127,120,.28)}
 
 .embed-modes{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
