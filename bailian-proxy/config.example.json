@@ -1,7 +1,11 @@
 {
-  "_说明": "复制本文件为 config.json 并填入你的真实配置。apiKey 必填；appId 与 model 二选一：建了智能体应用就填 appId（推荐，支持云端多轮记忆和人设/知识库），只想直调模型就填 model（如 qwen-plus）",
+  "_说明": "复制本文件为 config.json 并填入你的真实配置。apiKey 必填；appId 与 model 二选一。钉钉登录部分：dingtalkAppKey/dingtalkAppSecret 填好后管理后台强制钉钉登录（两者都留空则回退 ADMIN_TOKEN/本地开放模式）；dingtalkCorpId 用于钉钉客户端内免登；adminUsers 为钉钉 userId 白名单，留空表示企业内所有登录用户均可进后台。",
   "apiKey": "sk-你的百炼APIKey",
   "appId": "你的智能体应用ID（可选）",
   "model": "",
-  "systemPrompt": "你是中通冷链订单管理系统的智能助理「小冷」，为一线客服与操作员服务。你熟悉订单管理、异常工单、退单工单等模块的操作流程，回复要简洁、分点、可执行；涉及订单具体数据时提醒用户核对系统页面；无法解决时建议用户点击输入框上方的「一键转工单」转人工。请用简体中文回答。"
+  "systemPrompt": "你是中通冷链订单管理系统的智能助理「小冷」，为一线客服与操作员服务。你熟悉订单管理、异常工单、退单工单等模块的操作流程，回复要简洁、分点、可执行；涉及订单具体数据时提醒用户核对系统页面；无法解决时建议用户点击输入框上方的「一键转工单」转人工。请用简体中文回答。",
+  "dingtalkAppKey": "",
+  "dingtalkAppSecret": "",
+  "dingtalkCorpId": "",
+  "adminUsers": []
 }

@@ -1,5 +1,9 @@
 # 🔴 敏感配置：包含百炼 API Key，严禁上传
 bailian-proxy/config.json
+bailian-proxy/sessions.json
+
+# 运行时上传的图片（机器人头像/悬浮按钮图）
+bailian-proxy/uploads/
 
 # 运行时日志
 bailian-proxy/*.log

@@ -20,12 +20,26 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const dingtalk = require('./dingtalk');
 
 const DIST_ROOT = path.resolve(__dirname, '../dist');
 const PORT = process.env.PORT || 8787;
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
 const CFG_PATH = path.join(__dirname, 'config.json');
 const SIDEBAR_PATH = path.join(__dirname, 'sidebar.json');
+const UPLOAD_DIR = path.join(__dirname, 'uploads');
+
+// 后台可上传的图片类型：扩展名即落盘扩展名（不收 svg，避免脚本注入）
+const UPLOAD_TYPES = {
+  'image/png': '.png',
+  'image/jpeg': '.jpg',
+  'image/gif': '.gif',
+  'image/webp': '.webp'
+};
+const UPLOAD_NAME_RE = /^[a-z0-9-]+\.(png|jpg|gif|webp)$/;
+const SESSIONS_PATH = path.join(__dirname, 'sessions.json');
+const SESSION_COOKIE = 'zto_admin_sess';
+const SESSION_TTL = 7 * 24 * 60 * 60 * 1000;
 
 // JSON 配置读写：损坏时备份并回退空配置；写入走临时文件 + rename，避免写入中途崩溃留下截断 JSON
 function loadJson(filePath, label) {
@@ -76,6 +90,7 @@ const MIME = {
   '.json': 'application/json; charset=utf-8',
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
+  '.gif': 'image/gif',
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
   '.webp': 'image/webp',
@@ -92,24 +107,156 @@ function publicSettings(cfg) {
     appId: cfg.appId || '',
     model: cfg.model || '',
     systemPrompt: cfg.systemPrompt || '',
-    hasApiKey: Boolean(cfg.apiKey)
+    hasApiKey: Boolean(cfg.apiKey),
+    allowedDomains: cfg.allowedDomains || '',
+    embedToken: cfg.embedToken || ''
   };
+}
+
+// 防盗链白名单解析：支持逗号/空格/换行分隔，忽略协议与路径；空 → 允许任何网站嵌入
+function parseAllowedDomains(raw) {
+  return String(raw || '')
+    .split(/[\s,，;；]+/)
+    .map((item) => item.trim().replace(/^https?:\/\//i, '').replace(/\/.*$/, '').toLowerCase())
+    .filter((item) => /^[a-z0-9*.\-]+(:\d+)?$/i.test(item));
+}
+
+// CSP frame-ancestors 由浏览器强制执行：白名单外的站点 iframe 本页会被直接拒绝渲染
+function frameAncestorsCsp(cfg) {
+  const hosts = parseAllowedDomains(cfg.allowedDomains);
+  return hosts.length ? "frame-ancestors 'self' " + hosts.join(' ') : '';
 }
 
 function cleanText(value, maxLength) {
   return String(value == null ? '' : value).trim().slice(0, maxLength);
 }
 
+// ---------- 管理后台登录：钉钉扫码 + 钉钉内免登（移植自 houpe-auth） ----------
+function dingtalkCfg(cfg) {
+  return {
+    appKey: cfg.dingtalkAppKey || process.env.DINGTALK_APP_KEY || '',
+    appSecret: cfg.dingtalkAppSecret || process.env.DINGTALK_APP_SECRET || '',
+    corpId: cfg.dingtalkCorpId || process.env.DINGTALK_CORP_ID || ''
+  };
+}
+function dingtalkReady(cfg) {
+  const d = dingtalkCfg(cfg);
+  return Boolean(d.appKey && d.appSecret);
+}
+
+// 会话存 sessions.json（原子写），代理重启不掉登录态
+let sessions = null;
+function loadSessions() {
+  if (sessions) return sessions;
+  sessions = loadJson(SESSIONS_PATH, 'sessions');
+  const now = Date.now();
+  for (const sid of Object.keys(sessions)) {
+    if (!sessions[sid] || sessions[sid].expires < now) delete sessions[sid];
+  }
+  return sessions;
+}
+function saveSessions() {
+  try { writeJsonAtomic(SESSIONS_PATH, sessions || {}); }
+  catch (e) { console.error('[auth] 会话落盘失败:', e.message || e); }
+}
+function parseCookies(req) {
+  const out = {};
+  const raw = req.headers.cookie;
+  if (!raw) return out;
+  for (const part of raw.split(';')) {
+    const idx = part.indexOf('=');
+    if (idx > -1) {
+      try { out[part.slice(0, idx).trim()] = decodeURIComponent(part.slice(idx + 1).trim()); }
+      catch (e) { out[part.slice(0, idx).trim()] = part.slice(idx + 1).trim(); }
+    }
+  }
+  return out;
+}
+function createSession(user) {
+  const store = loadSessions();
+  const sid = crypto.randomBytes(32).toString('hex');
+  store[sid] = { user: user, expires: Date.now() + SESSION_TTL };
+  saveSessions();
+  return sid;
+}
+function sessionUser(req) {
+  const sid = parseCookies(req)[SESSION_COOKIE];
+  if (!sid || !/^[a-f0-9]{64}$/.test(sid)) return null;
+  const entry = loadSessions()[sid];
+  if (!entry || entry.expires < Date.now()) return null;
+  return entry.user;
+}
+function destroySession(req) {
+  const sid = parseCookies(req)[SESSION_COOKIE];
+  if (sid && loadSessions()[sid]) {
+    delete loadSessions()[sid];
+    saveSessions();
+  }
+}
+function setSessionCookie(res, sid) {
+  res.setHeader('Set-Cookie', SESSION_COOKIE + '=' + sid + '; Path=/; HttpOnly; SameSite=Lax; Max-Age=' + Math.floor(SESSION_TTL / 1000));
+}
+function clearSessionCookie(res) {
+  res.setHeader('Set-Cookie', SESSION_COOKIE + '=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0');
+}
+
+// 管理员判定（人员设置驱动）：勾选「管理员」的人员可登录后台。
+// 匹配顺序：staff.userId（登录时自动记录）→ staff.dingtalkId → 姓名；
+// 未配置任何管理员时回退 config.adminUsers（也空则全员可进，便于首次引导配置）。
+function inAdminWhitelist(cfg, user) {
+  const staff = Array.isArray(loadSidebar().staff) ? loadSidebar().staff : [];
+  const admins = staff.filter((s) => s && s.isAdmin);
+  if (admins.length) {
+    return admins.some((s) =>
+      (s.userId && s.userId === user.id) ||
+      (s.dingtalkId && s.dingtalkId === user.id) ||
+      (s.name && s.name === user.name)
+    );
+  }
+  const allowed = Array.isArray(cfg.adminUsers) ? cfg.adminUsers : [];
+  return allowed.length === 0 || allowed.includes(user.id);
+}
+
+// 登录成功后把钉钉 userId 自动记到匹配的管理员人员上：
+// 首次靠钉钉号/姓名匹配进来，之后精确按 userId 认，改名或钉钉号填错都不影响
+function recordStaffUserId(user) {
+  const sb = loadSidebar();
+  const staff = Array.isArray(sb.staff) ? sb.staff : [];
+  const hit = staff.find((s) => s && s.isAdmin && !s.userId &&
+    ((s.dingtalkId && s.dingtalkId === user.id) || (s.name && s.name === user.name)));
+  if (!hit) return;
+  hit.userId = user.id;
+  try {
+    writeJsonAtomic(SIDEBAR_PATH, sb);
+    console.log('[auth] 已自动记录管理员「' + hit.name + '」的钉钉 userId=' + user.id);
+  } catch (e) {
+    console.error('[auth] 记录 userId 失败:', e.message || e);
+  }
+}
+
+// 扫码登录 state → { redirect, expires }，防 CSRF；内存即可（5 分钟有效期）
+const loginStates = new Map();
+
 function isAdmin(req) {
-  if (!ADMIN_TOKEN) return true;
-  const supplied = Buffer.from(String(req.headers['x-admin-token'] || ''));
-  const expected = Buffer.from(ADMIN_TOKEN);
-  return supplied.length === expected.length && crypto.timingSafeEqual(supplied, expected);
+  if (ADMIN_TOKEN) {
+    const supplied = Buffer.from(String(req.headers['x-admin-token'] || ''));
+    const expected = Buffer.from(ADMIN_TOKEN);
+    if (supplied.length === expected.length && crypto.timingSafeEqual(supplied, expected)) return true;
+  }
+  const user = sessionUser(req);
+  if (user) {
+    const cfg = loadConfig();
+    // 已配置钉钉登录时，会话用户必须在白名单内
+    if (dingtalkReady(cfg)) return inAdminWhitelist(cfg, user);
+    return true;
+  }
+  // 既无令牌也无钉钉配置 → 维持旧的本地开放行为
+  return !ADMIN_TOKEN && !dingtalkReady(loadConfig());
 }
 
 function requireAdmin(req, res) {
   if (isAdmin(req)) return true;
-  send(res, 401, { success: false, error: '需要有效的管理令牌' });
+  send(res, 401, { success: false, error: '需要登录管理后台' });
   return false;
 }
 
@@ -120,7 +267,7 @@ function send(res, status, obj) {
   res.end(body);
 }
 
-function readBody(req) {
+function readBodyRaw(req, maxBytes, tooLargeMessage) {
   return new Promise((resolve, reject) => {
     // 先按字节收集、最后一次性解码：请求体里的中文被 TCP 分包切开时，
     // 逐段 += Buffer 会触发逐段 toString('utf8')，把切开的多字节字符替换成 �
@@ -129,16 +276,17 @@ function readBody(req) {
     req.on('data', (c) => {
       parts.push(c);
       size += c.length;
-      if (size > 8 * 1024 * 1024) { reject(new Error('body too large')); req.destroy(); }
+      if (size > maxBytes) { reject(new Error(tooLargeMessage)); req.destroy(); }
     });
-    req.on('end', () => {
-      try {
-        const raw = Buffer.concat(parts).toString('utf8');
-        resolve(raw ? JSON.parse(raw) : {});
-      }
-      catch (e) { reject(new Error('invalid JSON body')); }
-    });
+    req.on('end', () => resolve(Buffer.concat(parts)));
     req.on('error', reject);
+  });
+}
+function readBody(req) {
+  return readBodyRaw(req, 8 * 1024 * 1024, 'body too large').then((buf) => {
+    const raw = buf.toString('utf8');
+    try { return raw ? JSON.parse(raw) : {}; }
+    catch (e) { throw new Error('invalid JSON body'); }
   });
 }
 
@@ -433,10 +581,16 @@ function serveFile(res, filePath) {
   fs.readFile(filePath, (err, buf) => {
     if (err) { send(res, 404, { error: 'not found' }); return; }
     const ext = path.extname(filePath).toLowerCase();
-    res.writeHead(200, {
+    const headers = {
       'Content-Type': MIME[ext] || 'application/octet-stream',
       'Cache-Control': 'no-cache'
-    });
+    };
+    // 防盗链：配置了嵌入白名单后，页面仅允许本站与白名单站点 iframe 展示（悬浮与 iframe 嵌入最终都走 iframe，一并覆盖）
+    if (ext === '.html') {
+      const csp = frameAncestorsCsp(loadConfig());
+      if (csp) headers['Content-Security-Policy'] = csp;
+    }
+    res.writeHead(200, headers);
     res.end(buf);
   });
 }
@@ -462,6 +616,120 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // 嵌入脚本口令：配置 embedToken 后，/embed.js 必须带 ?token=口令 才下发，
+  // 抄走 script 地址但不知道口令的站点连气泡都加载不出（iframe 层另由 frame-ancestors 白名单把守）
+  if (req.method === 'GET' && req.url.split('?')[0] === '/embed.js') {
+    const cfg = loadConfig();
+    if (cfg.embedToken) {
+      let supplied = '';
+      try { supplied = new URL(req.url, 'http://localhost').searchParams.get('token') || ''; }
+      catch (e) { supplied = ''; }
+      const expected = String(cfg.embedToken);
+      const ok = supplied.length === expected.length
+        && crypto.timingSafeEqual(Buffer.from(supplied), Buffer.from(expected));
+      if (!ok) { send(res, 403, { error: 'invalid embed token' }); return; }
+    }
+    serveFile(res, path.join(DIST_ROOT, 'embed.js'));
+    return;
+  }
+
+  // ---------- 管理后台：钉钉登录 ----------
+  if (req.method === 'GET' && req.url.split('?')[0] === '/api/auth/me') {
+    const cfg = loadConfig();
+    const user = sessionUser(req);
+    send(res, 200, {
+      success: true,
+      loggedIn: Boolean(user),
+      user: user ? { id: user.id, name: user.name, avatar: user.avatar } : null,
+      dingtalkConfigured: dingtalkReady(cfg),
+      corpId: dingtalkCfg(cfg).corpId
+    });
+    return;
+  }
+
+  if (req.method === 'GET' && req.url.split('?')[0] === '/api/auth/dingtalk/url') {
+    const cfg = loadConfig();
+    if (!dingtalkReady(cfg)) { send(res, 400, { success: false, error: '未配置钉钉登录（dingtalkAppKey / dingtalkAppSecret）' }); return; }
+    const redirect = new URL(req.url, 'http://localhost').searchParams.get('redirect') || '/admin';
+    if (!redirect.startsWith('/')) { send(res, 400, { success: false, error: 'redirect 必须是站内路径' }); return; }
+    const state = crypto.randomBytes(16).toString('hex');
+    loginStates.set(state, { redirect: redirect, expires: Date.now() + 5 * 60 * 1000 });
+    setTimeout(() => loginStates.delete(state), 5 * 60 * 1000);
+    // 回调地址按请求来源推导（反代场景读 X-Forwarded-*），必须与钉钉开放平台「授权回调地址」完全一致
+    const proto = String(req.headers['x-forwarded-proto'] || 'http').split(',')[0].trim();
+    const host = String(req.headers['x-forwarded-host'] || req.headers.host || 'localhost:' + PORT);
+    const origin = (process.env.PUBLIC_ORIGIN || proto + '://' + host).replace(/\/+$/, '');
+    const callbackUrl = origin + '/api/auth/dingtalk/callback';
+    send(res, 200, { success: true, url: dingtalk.getQrConnectUrl(callbackUrl, state, dingtalkCfg(cfg).appKey) });
+    return;
+  }
+
+  if (req.method === 'GET' && req.url.split('?')[0] === '/api/auth/dingtalk/callback') {
+    const q = new URL(req.url, 'http://localhost').searchParams;
+    const state = q.get('state') || '';
+    const saved = loginStates.get(state);
+    loginStates.delete(state);
+    const backTo = saved && saved.redirect.startsWith('/') && saved.redirect !== '/login' ? saved.redirect : '/admin';
+    const fail = (msg) => {
+      res.writeHead(302, { Location: '/login?redirect=' + encodeURIComponent(backTo) + '&error=' + encodeURIComponent(msg) });
+      res.end();
+    };
+    if (!saved) { fail('登录状态已过期，请重新发起'); return; }
+    try {
+      const cfg = loadConfig();
+      const d = dingtalkCfg(cfg);
+      if (!dingtalkReady(cfg)) { fail('服务端未配置钉钉登录'); return; }
+      const user = await dingtalk.getUserByCode(q.get('code') || '', d.appKey, d.appSecret);
+      if (!inAdminWhitelist(cfg, user)) {
+        console.log('[auth] 非白名单登录被拒: ' + user.name + ' (' + user.userId + ')');
+        fail('该账号不在管理白名单内');
+        return;
+      }
+      setSessionCookie(res, createSession({ id: user.userId, name: user.name, avatar: user.avatar }));
+      recordStaffUserId({ id: user.userId, name: user.name });
+      console.log('[auth] 扫码登录: ' + user.name + ' (' + user.userId + ')');
+      res.writeHead(302, { Location: backTo });
+      res.end();
+    } catch (e) {
+      console.error('[auth] 扫码回调失败:', e.message);
+      fail(e.message || '钉钉登录失败');
+    }
+    return;
+  }
+
+  if (req.method === 'POST' && req.url.split('?')[0] === '/api/auth/dingtalk/auto') {
+    const cfg = loadConfig();
+    if (!dingtalkReady(cfg)) { send(res, 400, { success: false, error: '未配置钉钉登录' }); return; }
+    let body;
+    try { body = await readBody(req); }
+    catch (e) { send(res, 400, { success: false, error: e.message }); return; }
+    if (!body.authCode) { send(res, 400, { success: false, error: '缺少 authCode' }); return; }
+    try {
+      const d = dingtalkCfg(cfg);
+      const user = await dingtalk.getUserByAuthCode(body.authCode, d.appKey, d.appSecret);
+      if (!inAdminWhitelist(cfg, user)) {
+        console.log('[auth] 非白名单免登被拒: ' + user.name + ' (' + user.userId + ')');
+        send(res, 403, { success: false, error: '该账号不在管理白名单内' });
+        return;
+      }
+      setSessionCookie(res, createSession({ id: user.userId, name: user.name, avatar: user.avatar }));
+      recordStaffUserId({ id: user.userId, name: user.name });
+      console.log('[auth] 钉钉内免登: ' + user.name + ' (' + user.userId + ')');
+      send(res, 200, { success: true, user: { id: user.userId, name: user.name, avatar: user.avatar } });
+    } catch (e) {
+      console.error('[auth] 免登失败:', e.message);
+      send(res, 500, { success: false, error: e.message || '钉钉免登失败' });
+    }
+    return;
+  }
+
+  if (req.method === 'POST' && req.url.split('?')[0] === '/api/auth/logout') {
+    destroySession(req);
+    clearSessionCookie(res);
+    send(res, 200, { success: true });
+    return;
+  }
+
   // ---------- 管理后台：模型设置（API Key 只写不读） ----------
   if (req.method === 'GET' && req.url.split('?')[0] === '/api/admin/settings') {
     if (!requireAdmin(req, res)) return;
@@ -482,6 +750,9 @@ const server = http.createServer(async (req, res) => {
     cfg.appId = mode === 'app' ? appId : '';
     cfg.model = mode === 'model' ? model : '';
     cfg.systemPrompt = cleanText(body.systemPrompt, 20000);
+    // 仅显式传了才更新：saveAi 不带嵌入配置，不能把已配好的口令/白名单意外清掉
+    if (body.allowedDomains !== undefined) cfg.allowedDomains = cleanText(body.allowedDomains, 2000);
+    if (body.embedToken !== undefined) cfg.embedToken = cleanText(body.embedToken, 100);
     const apiKey = cleanText(body.apiKey, 500);
     if (apiKey) cfg.apiKey = apiKey;
     if (body.clearApiKey === true) cfg.apiKey = '';
@@ -509,19 +780,65 @@ const server = http.createServer(async (req, res) => {
     sb.onDuty = sb.onDuty || { byDate: {}, byWeekday: {} };
     sb.downloads = Array.isArray(sb.downloads) ? sb.downloads : [];
     sb.faq = Array.isArray(sb.faq) ? sb.faq : [];
-    // 人员设置：姓名与钉钉号，前端聊天窗口据此唤起钉钉单聊
+    // 人员设置：姓名与钉钉号，前端聊天窗口据此唤起钉钉单聊；isAdmin 勾选后可登录管理后台
     sb.staff = Array.isArray(sb.staff)
-      ? sb.staff.map((item) => ({ name: cleanText(item && item.name, 50), dingtalkId: cleanText(item && item.dingtalkId, 100) }))
+      ? sb.staff.map((item) => ({
+          name: cleanText(item && item.name, 50),
+          dingtalkId: cleanText(item && item.dingtalkId, 100),
+          isAdmin: Boolean(item && item.isAdmin),
+          userId: cleanText(item && item.userId, 100)
+        }))
         .filter((item) => item.name || item.dingtalkId)
       : [];
-    // 机器人形象：名称与头像（头像可为图片 URL 或文字/表情）
+    // 机器人形象：名称、头像与悬浮按钮图（均可为图片 URL 或文字/表情；悬浮按钮图留空时沿用头像）
     const brand = (sb.brand && typeof sb.brand === 'object') ? sb.brand : {};
-    sb.brand = { name: cleanText(brand.name, 30), avatar: cleanText(brand.avatar, 500) };
+    sb.brand = { name: cleanText(brand.name, 30), avatar: cleanText(brand.avatar, 500), launcher: cleanText(brand.launcher, 500) };
     try {
       writeJsonAtomic(SIDEBAR_PATH, sb);
       send(res, 200, { success: true, config: sb, today: todayDuty(sb) });
     } catch (e) {
       send(res, 500, { success: false, error: '保存失败: ' + (e.message || e) });
+    }
+    return;
+  }
+
+  // ---------- 图片上传（机器人头像 / 悬浮按钮图等，请求体即原始图片字节） ----------
+  if (req.method === 'POST' && req.url.split('?')[0] === '/api/upload') {
+    if (!requireAdmin(req, res)) return;
+    const type = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+    const ext = UPLOAD_TYPES[type];
+    if (!ext) { send(res, 400, { success: false, error: '仅支持 PNG / JPG / GIF / WebP 图片' }); return; }
+    let buf;
+    try { buf = await readBodyRaw(req, 2 * 1024 * 1024, '图片不能超过 2MB'); }
+    catch (e) { send(res, 400, { success: false, error: e.message }); return; }
+    if (!buf.length) { send(res, 400, { success: false, error: '上传内容为空' }); return; }
+    const filename = Date.now().toString(36) + '-' + crypto.randomBytes(4).toString('hex') + ext;
+    try {
+      fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+      fs.writeFileSync(path.join(UPLOAD_DIR, filename), buf);
+      console.log('[upload] 保存图片 ' + filename + '（' + buf.length + ' 字节）');
+      send(res, 200, { success: true, url: '/uploads/' + filename });
+    } catch (e) {
+      send(res, 500, { success: false, error: '写入文件失败: ' + (e.message || e) });
+    }
+    return;
+  }
+
+  // 上传图片静态服务：文件名本身含随机串，改图即换名，可永久缓存
+  if (req.method === 'GET' && req.url.split('?')[0].startsWith('/uploads/')) {
+    let relative = '';
+    try { relative = decodeURIComponent(req.url.split('?')[0].slice('/uploads/'.length)); }
+    catch (e) { relative = ''; }
+    if (!UPLOAD_NAME_RE.test(relative)) { send(res, 404, { error: 'not found' }); return; }
+    const filePath = path.join(UPLOAD_DIR, relative);
+    if (filePath.startsWith(UPLOAD_DIR + path.sep) && fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+      res.writeHead(200, {
+        'Content-Type': MIME[path.extname(filePath).toLowerCase()] || 'application/octet-stream',
+        'Cache-Control': 'public, max-age=31536000, immutable'
+      });
+      fs.createReadStream(filePath).pipe(res);
+    } else {
+      send(res, 404, { error: 'not found' });
     }
     return;
   }
@@ -672,7 +989,13 @@ server.listen(PORT, () => {
   console.log('  接入模式 : ' + mode);
   console.log('  Key 状态 : ' + (cfg.apiKey ? '已配置' : '未配置'));
   console.log('  ─────────────────────────────────────────');
-  console.log('  管理鉴权 : ' + (ADMIN_TOKEN ? '已启用 ADMIN_TOKEN' : '未启用（仅建议本地/内网使用）'));
+  const bootCfg = loadConfig();
+  const bootAdmins = (Array.isArray(loadSidebar().staff) ? loadSidebar().staff : []).filter((s) => s && s.isAdmin);
+  console.log('  管理鉴权 : ' + (dingtalkReady(bootCfg)
+    ? bootAdmins.length
+      ? '钉钉登录已启用（管理员 ' + bootAdmins.length + ' 人，其余钉钉用户禁止登录）'
+      : '钉钉登录已启用（未配置管理员，登录后请到「人员设置」勾选）'
+    : ADMIN_TOKEN ? '已启用 ADMIN_TOKEN' : '未启用（仅建议本地/内网使用）'));
   console.log('  对话限流 : ' + (RATE_LIMIT > 0 ? '每 IP ' + RATE_LIMIT + ' 次/分钟' : '未启用'));
   console.log('');
 });

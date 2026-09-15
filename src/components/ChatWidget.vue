@@ -22,6 +22,9 @@ const messages = ref([])
 const sidebar = ref({ onDuty: { byDate: {}, byWeekday: {} }, faq: [] })
 const messageList = ref(null)
 
+// 全屏/移动端整页嵌入（?mode=full）：直接展开对话窗铺满容器，隐藏最小化/关闭（关掉会让 iframe 空白）
+const full = params.get('mode') === 'full'
+
 // 每 30 秒跳动一次，让“今日值班”跨零点后能重新计算
 const nowTick = ref(Date.now())
 let clockTimer = 0
@@ -37,8 +40,13 @@ const quickQuestions = computed(() => (sidebar.value.faq || []).slice(0, 5))
 // 机器人形象：名称与头像（头像为图片 URL 时渲染图片，否则渲染文字/表情）
 const title = computed(() => urlTitle || sidebar.value.brand?.name || '小冷')
 const avatar = computed(() => String(sidebar.value.brand?.avatar || '').trim())
-const avatarIsImage = computed(() => /^(https?:|data:image)/i.test(avatar.value))
+const avatarIsImage = computed(() => /^(https?:|data:image|\/uploads\/)/i.test(avatar.value))
 const avatarText = computed(() => avatar.value || 'AI')
+// 悬浮按钮图：单独配置时优先，否则沿用头像
+const launcher = computed(() => String(sidebar.value.brand?.launcher || '').trim())
+const launcherIsImage = computed(() => /^(https?:|data:image|\/uploads\/)/i.test(launcher.value) || (!launcher.value && avatarIsImage.value))
+const launcherImage = computed(() => launcher.value || avatar.value)
+const launcherText = computed(() => launcher.value || avatarText.value)
 
 // 人员钉钉号映射：{ 姓名: 钉钉号 }，配置后点击姓名可唤起钉钉单聊
 const staffMap = computed(() => {
@@ -82,7 +90,13 @@ async function scrollToBottom() {
   await nextTick()
   if (messageList.value) messageList.value.scrollTop = messageList.value.scrollHeight
 }
+const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
 function startAnswerAnimation(answer) {
+  if (reduceMotion) {
+    answer.displayContent = answer.content
+    if (answer.done) answer.pending = false
+    return
+  }
   if (answer.animationId) return
   const tick = () => {
     const full = Array.from(answer.content)
@@ -97,9 +111,10 @@ function startAnswerAnimation(answer) {
       answer.animationId = 0
       return
     }
-    answer.animationId = requestAnimationFrame(tick)
+    // 用 setTimeout 而非 rAF 驱动：rAF 在隐藏 iframe/后台标签中会完全暂停，回复会永远停在打字动画
+    answer.animationId = setTimeout(tick, 16)
   }
-  answer.animationId = requestAnimationFrame(tick)
+  answer.animationId = setTimeout(tick, 16)
 }
 function chunkText(data) {
   if (typeof data?.text === 'string') return data.text
@@ -156,6 +171,7 @@ async function send(question = input.value) {
 
 onMounted(async () => {
   clockTimer = setInterval(() => { nowTick.value = Date.now() }, 30 * 1000)
+  if (full) openChat()
   notify('collapsed')
   try {
     const [ping, config] = await Promise.all([fetch('/api/ping'), fetch('/api/sidebar')])
@@ -168,9 +184,9 @@ onUnmounted(() => clearInterval(clockTimer))
 </script>
 
 <template>
-  <div class="widget-root" :class="{ embedded, maximized }">
+  <div class="widget-root" :class="{ embedded, maximized, full }">
     <button v-if="!open" class="launcher" type="button" aria-label="打开智能助理" @click="openChat">
-      <span class="launcher-mark"><img v-if="avatarIsImage" :src="avatar" alt=""><template v-else>{{ avatarText }}</template></span>
+      <span class="launcher-mark"><img v-if="launcherIsImage" :src="launcherImage" alt=""><template v-else>{{ launcherText }}</template></span>
       <span class="launcher-pulse" />
     </button>
 
@@ -187,12 +203,12 @@ onUnmounted(() => clearInterval(clockTimer))
               <path d="M21 3v5h-5" />
             </svg>
           </button>
-          <button type="button" title="最小化" aria-label="最小化" @click="minimize">
+          <button v-if="!full" type="button" title="最小化" aria-label="最小化" @click="minimize">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M5 12h14" />
             </svg>
           </button>
-          <button type="button" :title="maximized ? '还原' : '最大化'" :aria-label="maximized ? '还原' : '最大化'" @click="toggleMaximize">
+          <button v-if="!full" type="button" :title="maximized ? '还原' : '最大化'" :aria-label="maximized ? '还原' : '最大化'" @click="toggleMaximize">
             <svg v-if="!maximized" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M8 3H5a2 2 0 0 0-2 2v3" />
               <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
@@ -264,8 +280,11 @@ onUnmounted(() => clearInterval(clockTimer))
               </div>
             </div>
           </div>
+          <div v-if="quickQuestions.length" class="mobile-quick">
+            <button v-for="item in quickQuestions.slice(0, 4)" :key="item.q" type="button" @click="send(item.q)">{{ item.q }}</button>
+          </div>
           <div class="composer">
-            <textarea v-model="input" rows="4" placeholder="请输入你的问题…" aria-label="输入问题" @keydown.enter.exact.prevent="send()" />
+            <textarea v-model="input" rows="3" placeholder="请输入你的问题…" aria-label="输入问题" @keydown.enter.exact.prevent="send()" />
             <div class="composer-footer"><span>Enter 发送 · Shift+Enter 换行</span><button type="button" :disabled="loading || !input.trim()" @click="send()">发送</button></div>
           </div>
         </main>
