@@ -22,6 +22,8 @@ const sessionId = ref(null)
 const messages = ref([])
 const sidebar = ref({ onDuty: { byDate: {}, byWeekday: {} }, faq: [] })
 const messageList = ref(null)
+const imagePreview = ref('')
+let imageClickListener = null
 
 // 全屏/移动端整页嵌入（?mode=full）：直接展开对话窗铺满容器，隐藏最小化/关闭（关掉会让 iframe 空白）
 const full = params.get('mode') === 'full'
@@ -202,6 +204,13 @@ onMounted(async () => {
   clockTimer = setInterval(() => { nowTick.value = Date.now() }, 30 * 1000)
   if (full) openChat()
   notify('collapsed')
+  // 回答里的图片点击放大预览（v-html 内容无法直接绑定，走事件委托）
+  imageClickListener = (event) => {
+    if (event.target instanceof HTMLElement && event.target.classList.contains('message-image')) {
+      imagePreview.value = event.target.getAttribute('src') || ''
+    }
+  }
+  document.addEventListener('click', imageClickListener)
   try {
     const [ping, config] = await Promise.all([fetch('/api/ping'), fetch('/api/sidebar')])
     const pingData = await ping.json()
@@ -211,7 +220,10 @@ onMounted(async () => {
     if (data.success) sidebar.value = data.config || sidebar.value
   } catch { online.value = false }
 })
-onUnmounted(() => clearInterval(clockTimer))
+onUnmounted(() => {
+  clearInterval(clockTimer)
+  if (imageClickListener) document.removeEventListener('click', imageClickListener)
+})
 </script>
 
 <template>
@@ -349,5 +361,10 @@ onUnmounted(() => clearInterval(clockTimer))
         </main>
       </div>
     </section>
+
+    <!-- 回答内图片放大预览：点遮罩关闭 -->
+    <div v-if="imagePreview" class="image-preview" role="dialog" aria-label="图片预览" @click="imagePreview = ''">
+      <img :src="imagePreview" alt="预览大图">
+    </div>
   </div>
 </template>

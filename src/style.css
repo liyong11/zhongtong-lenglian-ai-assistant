@@ -164,7 +164,13 @@ span.download-link.pending,span.download-link.pending:hover{color:var(--ink-4);c
 .message-markdown table{display:block;max-width:100%;overflow:auto;border-collapse:collapse;scrollbar-width:thin}
 .message-markdown th,.message-markdown td{padding:7px 9px;border:1px solid #dbe3ea;text-align:left}
 .message-markdown th{background:var(--soft);font-weight:700}
-.message-image{display:block;max-width:100%;max-height:360px;margin:10px 0;border-radius:10px;object-fit:contain}
+.message-image{display:block;max-width:100%;max-height:360px;margin:10px 0;border-radius:10px;object-fit:contain;cursor:zoom-in;transition:opacity .15s var(--ease)}
+.message-image:hover{opacity:.92}
+
+/* 图片放大预览：全屏遮罩，点击任意处关闭 */
+.image-preview{position:fixed;inset:0;z-index:1200;display:grid;place-items:center;padding:32px;background:rgba(7,20,28,.86);cursor:zoom-out;animation:fade-in .18s var(--ease)}
+.image-preview img{max-width:min(94vw,1400px);max-height:92vh;border-radius:12px;box-shadow:0 24px 80px rgba(0,0,0,.5)}
+@keyframes fade-in{from{opacity:0}to{opacity:1}}
 
 .typing{display:inline-flex;align-items:center;gap:4px;min-height:1.4em;margin-left:2px;color:var(--ink-4)}
 .typing i{width:5px;height:5px;border-radius:50%;background:var(--primary);opacity:.5;animation:typing-bounce 1.05s ease-in-out infinite}
