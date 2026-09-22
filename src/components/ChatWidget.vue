@@ -285,7 +285,7 @@ onUnmounted(() => clearInterval(clockTimer))
                 :title="item.url ? `下载${item.name}` : '链接待配置'"
                 :aria-label="item.url ? `下载${item.name}` : undefined"
                 class="download-link"
-                :class="{ empty: !item.url }"
+                :class="{ pending: !item.url }"
                 :target="item.url ? '_blank' : undefined"
                 :rel="item.url ? 'noopener' : undefined"
                 @click.stop

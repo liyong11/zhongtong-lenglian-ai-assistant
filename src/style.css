@@ -95,7 +95,7 @@ a.staff-ding:hover{background:#d0f1ee;color:#08655f}
 .download-link span{flex:none;display:grid;place-items:center;width:18px;height:18px;border-radius:50%;background:#eef2f6;color:var(--ink-4);font-size:12px;line-height:1;transition:background .15s var(--ease),color .15s var(--ease)}
 a.download-link:hover{background:var(--primary-soft);color:var(--primary-strong)}
 a.download-link:hover span{background:#fff;color:var(--primary-strong)}
-span.download-link.empty,span.download-link.empty:hover{color:var(--ink-4);cursor:default;background:transparent}
+span.download-link.pending,span.download-link.pending:hover{color:var(--ink-4);cursor:default;background:transparent}
 .mobile-duty{display:none;flex:none;align-items:center;gap:8px;padding:12px 14px 0;overflow-x:auto;-webkit-overflow-scrolling:touch}
 .mobile-duty-label{flex:none;color:var(--ink-4);font-size:11px;font-weight:800;letter-spacing:.06em}
 .mobile-duty-staff{display:flex;gap:6px}
