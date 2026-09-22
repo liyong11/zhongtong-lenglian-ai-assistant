@@ -37,6 +37,8 @@ const today = computed(() => {
   return { date, weekday, staff: duty.byDate?.[date] || duty.byWeekday?.[weekday] || [] }
 })
 const quickQuestions = computed(() => (sidebar.value.faq || []).slice(0, 5))
+// 常用下载（后台「下载汇总」配置）：未填链接的条目置灰占位
+const downloads = computed(() => (sidebar.value.downloads || []).filter(item => item && item.name))
 
 // 机器人形象：名称与头像（头像为图片 URL 时渲染图片，否则渲染文字/表情）
 const title = computed(() => urlTitle || sidebar.value.brand?.name || '小冷')
@@ -225,6 +227,16 @@ onUnmounted(() => clearInterval(clockTimer))
           <span class="bot-avatar"><img v-if="avatarIsImage" :src="avatar" alt=""><template v-else>{{ avatarText }}</template></span>
           <span><b>{{ title }}</b><small><i :class="{ online }" />{{ online ? '服务正常' : '服务未配置' }}</small></span>
         </div>
+        <!-- 今日技术支持：从侧栏上移到标题栏，人名可点发起钉钉单聊 -->
+        <div v-if="today.staff.length" class="header-duty">
+          <span class="header-duty-label">今日技术支持</span>
+          <div class="header-duty-staff">
+            <template v-for="name in today.staff" :key="name">
+              <a v-if="dingtalkLink(name)" :href="dingtalkLink(name)" class="staff-ding" :title="`钉钉联系${name}`" :aria-label="`钉钉联系${name}`" @click.stop>{{ name }}</a>
+              <span v-else class="header-duty-name">{{ name }}</span>
+            </template>
+          </div>
+        </div>
         <div class="window-actions">
           <button type="button" title="新对话" aria-label="新对话" @click="resetChat">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -262,17 +274,23 @@ onUnmounted(() => clearInterval(clockTimer))
 
       <div class="chat-layout">
         <aside class="chat-aside">
-          <div class="aside-card">
-            <span class="eyebrow">今日技术支持</span>
-            <strong>{{ today.weekday }} · {{ today.date }}</strong>
-            <div v-if="today.staff.length" class="staff-list">
-              <template v-for="name in today.staff" :key="name">
-                <a v-if="dingtalkLink(name)" :href="dingtalkLink(name)" class="staff-ding" :title="`钉钉联系${name}`" :aria-label="`钉钉联系${name}`" @click.stop>{{ name }}</a>
-                <span v-else>{{ name }}</span>
-              </template>
+          <div v-if="downloads.length" class="aside-card">
+            <span class="eyebrow">常用下载</span>
+            <div class="download-list">
+              <component
+                :is="item.url ? 'a' : 'span'"
+                v-for="item in downloads"
+                :key="item.name"
+                :href="item.url || undefined"
+                :title="item.url ? `下载${item.name}` : '链接待配置'"
+                :aria-label="item.url ? `下载${item.name}` : undefined"
+                class="download-link"
+                :class="{ empty: !item.url }"
+                :target="item.url ? '_blank' : undefined"
+                :rel="item.url ? 'noopener' : undefined"
+                @click.stop
+              >{{ item.name }}<span aria-hidden="true">⤓</span></component>
             </div>
-            <p v-else>今日暂无值班安排</p>
-            <small v-if="today.staff.some(name => dingtalkLink(name))" class="staff-tip">点击姓名可发起钉钉单聊</small>
           </div>
           <div class="aside-card grow">
             <span class="eyebrow">常见问题</span>
