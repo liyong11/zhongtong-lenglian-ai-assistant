@@ -88,7 +88,7 @@ a.staff-ding:hover{background:#d0f1ee;color:#08655f}
 .header-duty-label{flex:none;color:var(--ink-4);font-size:11px;font-weight:800;letter-spacing:.06em}
 .header-duty-staff{display:flex;gap:6px}
 
-/* 侧栏「常用下载」：每项提供扫码下载 + 直接下载两种方式，无链接条目置灰 */
+/* 侧栏「常用下载」：条目只放一个下载按钮，点击弹窗内选扫码或直链 */
 .download-list{display:flex;flex-direction:column;gap:2px}
 .download-item{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border-radius:10px;transition:background .15s var(--ease)}
 .download-item:hover{background:var(--primary-soft)}
@@ -96,19 +96,26 @@ a.staff-ding:hover{background:#d0f1ee;color:#08655f}
 .download-item.pending:hover{background:transparent}
 .download-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink-2);font-size:13.5px}
 .download-item.pending .download-name{color:var(--ink-4)}
-.download-actions{display:flex;gap:4px;flex:none}
-.download-act{display:grid;place-items:center;width:26px;height:26px;border:0;border-radius:8px;background:transparent;color:var(--ink-3);cursor:pointer;transition:background .15s var(--ease),color .15s var(--ease)}
-.download-act svg{width:15px;height:15px}
+.download-act{flex:none;display:grid;place-items:center;width:28px;height:28px;border:0;border-radius:9px;background:transparent;color:var(--ink-3);cursor:pointer;transition:background .15s var(--ease),color .15s var(--ease)}
+.download-act svg{width:16px;height:16px}
 .download-act:hover{background:#fff;color:var(--primary-strong)}
-span.download-act{cursor:default;color:var(--ink-4)}
-span.download-act:hover{background:transparent}
 
-/* 下载二维码弹层 */
-.qr-preview{position:fixed;inset:0;z-index:1200;display:grid;place-items:center;padding:32px;background:rgba(7,20,28,.86);cursor:zoom-out;animation:fade-in .18s var(--ease);pointer-events:auto}
-.qr-card{display:flex;flex-direction:column;align-items:center;gap:6px;padding:22px 26px 18px;border-radius:16px;background:#fff;box-shadow:0 24px 80px rgba(0,0,0,.5);cursor:default;pointer-events:auto}
-.qr-card img{width:min(64vw,240px);height:auto;border-radius:8px}
-.qr-card b{color:var(--ink);font-size:14px}
-.qr-card small{color:var(--ink-3);font-size:12px}
+/* 下载弹窗：图标 + 名称 + 二维码 + 主色直链按钮 */
+.dl-mask{position:fixed;inset:0;z-index:1200;display:grid;place-items:center;padding:32px;background:rgba(7,20,28,.66);backdrop-filter:blur(4px);cursor:zoom-out;animation:fade-in .18s var(--ease);pointer-events:auto}
+.dl-dialog{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;width:min(88vw,340px);padding:30px 28px 26px;border-radius:20px;background:#fff;box-shadow:0 30px 90px rgba(4,24,34,.35);cursor:default;pointer-events:auto;text-align:center;animation:dialog-in .22s var(--ease)}
+@keyframes dialog-in{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:none}}
+.dl-close{position:absolute;right:12px;top:12px;display:grid;place-items:center;width:32px;height:32px;border:0;border-radius:10px;background:transparent;color:var(--ink-3);cursor:pointer;transition:background .15s var(--ease),color .15s var(--ease)}
+.dl-close svg{width:16px;height:16px}
+.dl-close:hover{background:#f1f5f8;color:var(--ink)}
+.dl-dialog-icon{display:grid;place-items:center;width:52px;height:52px;margin-bottom:6px;border-radius:16px;background:linear-gradient(145deg,#1cb5a9,#087f78);color:#fff;box-shadow:0 10px 24px rgba(8,127,120,.3)}
+.dl-dialog-icon svg{width:24px;height:24px}
+.dl-dialog h3{margin:0;color:var(--ink);font-size:16.5px}
+.dl-dialog-sub{margin:0 0 14px;color:var(--ink-3);font-size:12.5px}
+.dl-dialog-qr{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px;margin-bottom:14px;border:1px solid var(--border);border-radius:14px;background:#fbfcfd}
+.dl-dialog-qr img{width:180px;height:180px;border-radius:8px}
+.dl-dialog-qr small{color:var(--ink-3);font-size:11.5px}
+.dl-dialog-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;width:100%;padding:12px 18px;border-radius:12px;font-size:14px}
+.dl-dialog-btn svg{width:17px;height:17px}
 .mobile-duty{display:none;flex:none;align-items:center;gap:8px;padding:12px 14px 0;overflow-x:auto;-webkit-overflow-scrolling:touch}
 .mobile-duty-label{flex:none;color:var(--ink-4);font-size:11px;font-weight:800;letter-spacing:.06em}
 .mobile-duty-staff{display:flex;gap:6px}

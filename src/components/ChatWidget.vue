@@ -39,16 +39,25 @@ const today = computed(() => {
   return { date, weekday, staff: duty.byDate?.[date] || duty.byWeekday?.[weekday] || [] }
 })
 const quickQuestions = computed(() => (sidebar.value.faq || []).slice(0, 5))
-// 常用下载（后台「下载汇总」配置）：每项的展示方式（扫码/直链）由后台勾选决定；旧数据无字段默认两种都开
+// 常用下载（后台「下载汇总」配置）：条目只放一个下载按钮，点击弹出「扫码 / 直链」下载弹窗；
+// 弹窗内容仍受后台方式勾选控制，旧数据无字段默认两种都展示
 const downloads = computed(() => (sidebar.value.downloads || []).filter(item => item && item.name))
 const hasMethod = (item, method) => !Array.isArray(item.methods) || item.methods.includes(method)
-const qrPreview = ref({ name: '', image: '' })
-async function showQr(item) {
+const dlPreview = ref(null)
+const dlQrImage = ref('')
+async function openDownload(item) {
   if (!item.url) return
+  dlPreview.value = item
+  dlQrImage.value = ''
+  if (!hasMethod(item, 'qr')) return
   try {
     const QRCode = await import('qrcode')
-    qrPreview.value = { name: item.name, image: await QRCode.toDataURL(item.url, { width: 512, margin: 2, color: { dark: '#0f1f2d' } }) }
-  } catch { /* 生成失败时保持原状 */ }
+    dlQrImage.value = await QRCode.toDataURL(item.url, { width: 512, margin: 2, color: { dark: '#0f1f2d' } })
+  } catch { /* 生成失败时弹窗内隐藏二维码区，保留直链按钮 */ }
+}
+function closeDownload() {
+  dlPreview.value = null
+  dlQrImage.value = ''
 }
 
 // 机器人形象：名称与头像（头像为图片 URL 时渲染图片，否则渲染文字/表情）
@@ -300,24 +309,9 @@ onUnmounted(() => {
             <div class="download-list">
               <div v-for="item in downloads" :key="item.name" class="download-item" :class="{ pending: !item.url }">
                 <span class="download-name" :title="item.url ? item.name : '链接待配置'">{{ item.name }}</span>
-                <div class="download-actions">
-                  <button v-if="item.url && hasMethod(item, 'qr')" type="button" class="download-act" title="查看下载二维码" :aria-label="`查看${item.name}下载二维码`" @click="showQr(item)">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v.01M14 20v.01M17.5 17.5h.01M20 20v.01"/></svg>
-                  </button>
-                  <component
-                    :is="item.url && hasMethod(item, 'direct') ? 'a' : 'span'"
-                    v-if="item.url && hasMethod(item, 'direct')"
-                    :href="item.url"
-                    :title="`直接下载${item.name}`"
-                    :aria-label="`直接下载${item.name}`"
-                    class="download-act"
-                    target="_blank"
-                    rel="noopener"
-                    @click.stop
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 21h16"/></svg>
-                  </component>
-                </div>
+                <button v-if="item.url" type="button" class="download-act" title="下载" :aria-label="`下载${item.name}`" @click="openDownload(item)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 21h16"/></svg>
+                </button>
               </div>
             </div>
           </div>
@@ -384,12 +378,31 @@ onUnmounted(() => {
       <img :src="imagePreview" alt="预览大图">
     </div>
 
-    <!-- 下载二维码：手机扫码下载，点遮罩关闭 -->
-    <div v-if="qrPreview.image" class="qr-preview" role="dialog" aria-label="下载二维码" @click="qrPreview = { name: '', image: '' }">
-      <div class="qr-card" @click.stop>
-        <img :src="qrPreview.image" :alt="`${qrPreview.name}下载二维码`">
-        <b>{{ qrPreview.name }}</b>
-        <small>手机扫码下载</small>
+    <!-- 下载弹窗：扫码下载 + 直接下载（内容受后台方式勾选控制），点遮罩或关闭按钮退出 -->
+    <div v-if="dlPreview" class="dl-mask" role="dialog" aria-modal="true" :aria-label="`${dlPreview.name}下载`" @click="closeDownload">
+      <div class="dl-dialog" @click.stop>
+        <button type="button" class="dl-close" aria-label="关闭" @click="closeDownload">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+        <span class="dl-dialog-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 21h16"/></svg>
+        </span>
+        <h3>{{ dlPreview.name }}</h3>
+        <p class="dl-dialog-sub">选择适合你的下载方式</p>
+        <div v-if="dlQrImage" class="dl-dialog-qr">
+          <img :src="dlQrImage" :alt="`${dlPreview.name}下载二维码`">
+          <small>手机扫码下载 · 或用浏览器打开</small>
+        </div>
+        <a
+          v-if="hasMethod(dlPreview, 'direct')"
+          class="button primary dl-dialog-btn"
+          :href="dlPreview.url"
+          target="_blank"
+          rel="noopener"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 21h16"/></svg>
+          直接下载
+        </a>
       </div>
     </div>
   </div>
