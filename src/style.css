@@ -88,14 +88,27 @@ a.staff-ding:hover{background:#d0f1ee;color:#08655f}
 .header-duty-label{flex:none;color:var(--ink-4);font-size:11px;font-weight:800;letter-spacing:.06em}
 .header-duty-staff{display:flex;gap:6px}
 
-/* 侧栏「常用下载」：无链接条目置灰占位 */
+/* 侧栏「常用下载」：每项提供扫码下载 + 直接下载两种方式，无链接条目置灰 */
 .download-list{display:flex;flex-direction:column;gap:2px}
-.download-link{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px;border-radius:10px;background:transparent;color:var(--ink-2);text-align:left;font-size:13.5px;text-decoration:none;cursor:pointer;transition:background .15s var(--ease),color .15s var(--ease)}
-.download-link:last-child{margin-bottom:-4px}
-.download-link span{flex:none;display:grid;place-items:center;width:18px;height:18px;border-radius:50%;background:#eef2f6;color:var(--ink-4);font-size:12px;line-height:1;transition:background .15s var(--ease),color .15s var(--ease)}
-a.download-link:hover{background:var(--primary-soft);color:var(--primary-strong)}
-a.download-link:hover span{background:#fff;color:var(--primary-strong)}
-span.download-link.pending,span.download-link.pending:hover{color:var(--ink-4);cursor:default;background:transparent}
+.download-item{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border-radius:10px;transition:background .15s var(--ease)}
+.download-item:hover{background:var(--primary-soft)}
+.download-item.pending{cursor:default}
+.download-item.pending:hover{background:transparent}
+.download-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink-2);font-size:13.5px}
+.download-item.pending .download-name{color:var(--ink-4)}
+.download-actions{display:flex;gap:4px;flex:none}
+.download-act{display:grid;place-items:center;width:26px;height:26px;border:0;border-radius:8px;background:transparent;color:var(--ink-3);cursor:pointer;transition:background .15s var(--ease),color .15s var(--ease)}
+.download-act svg{width:15px;height:15px}
+.download-act:hover{background:#fff;color:var(--primary-strong)}
+span.download-act{cursor:default;color:var(--ink-4)}
+span.download-act:hover{background:transparent}
+
+/* 下载二维码弹层 */
+.qr-preview{position:fixed;inset:0;z-index:1200;display:grid;place-items:center;padding:32px;background:rgba(7,20,28,.86);cursor:zoom-out;animation:fade-in .18s var(--ease)}
+.qr-card{display:flex;flex-direction:column;align-items:center;gap:6px;padding:22px 26px 18px;border-radius:16px;background:#fff;box-shadow:0 24px 80px rgba(0,0,0,.5);cursor:default}
+.qr-card img{width:min(64vw,240px);height:auto;border-radius:8px}
+.qr-card b{color:var(--ink);font-size:14px}
+.qr-card small{color:var(--ink-3);font-size:12px}
 .mobile-duty{display:none;flex:none;align-items:center;gap:8px;padding:12px 14px 0;overflow-x:auto;-webkit-overflow-scrolling:touch}
 .mobile-duty-label{flex:none;color:var(--ink-4);font-size:11px;font-weight:800;letter-spacing:.06em}
 .mobile-duty-staff{display:flex;gap:6px}
