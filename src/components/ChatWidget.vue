@@ -384,7 +384,7 @@ onUnmounted(() => {
 
     <!-- 下载二维码：手机扫码下载，点遮罩关闭 -->
     <div v-if="qrPreview.image" class="qr-preview" role="dialog" aria-label="下载二维码" @click="qrPreview = { name: '', image: '' }">
-      <div class="qr-card">
+      <div class="qr-card" @click.stop>
         <img :src="qrPreview.image" :alt="`${qrPreview.name}下载二维码`">
         <b>{{ qrPreview.name }}</b>
         <small>手机扫码下载</small>
