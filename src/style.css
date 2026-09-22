@@ -305,6 +305,11 @@ span.download-act:hover{background:transparent}
 .embed-mode .button{align-self:flex-start}
 
 .editable-row{display:grid;grid-template-columns:220px minmax(0,1fr) 34px;gap:9px}
+.editable-row.dl-row{grid-template-columns:180px minmax(0,1fr) auto 34px;align-items:center}
+.dl-methods{display:flex;gap:10px;flex:none}
+.dl-method{display:inline-flex;align-items:center;gap:5px;cursor:pointer;user-select:none}
+.dl-method input{width:15px;height:15px;accent-color:var(--primary);cursor:pointer}
+.dl-method i{font-style:normal;color:var(--ink-2);font-size:12.5px;font-weight:600;white-space:nowrap}
 .staff-row{grid-template-columns:200px minmax(0,1fr) auto 34px}
 .admin-switch{display:inline-flex;align-items:center;gap:7px;align-self:center;color:var(--ink-3);font-size:12px;font-weight:600;cursor:pointer;user-select:none;white-space:nowrap}
 .admin-switch input{position:absolute;opacity:0;pointer-events:none}
@@ -383,6 +388,9 @@ code{padding:2px 5px;border-radius:5px;background:#f1f5f9;color:var(--primary-de
   .editable-row{grid-template-columns:1fr 34px}
   .editable-row input:nth-child(2){grid-column:1}
   .editable-row button{grid-row:1/3;grid-column:2}
+  .dl-row{grid-template-columns:1fr 34px}
+  .dl-row .dl-methods{grid-column:1}
+  .dl-row button{grid-row:1/3;grid-column:2}
   .staff-row .admin-switch{grid-column:1}
   .staff-row button{grid-row:1/4}
   .card-actions.between{align-items:flex-start;gap:12px;flex-direction:column}

@@ -778,7 +778,17 @@ const server = http.createServer(async (req, res) => {
     catch (e) { send(res, 400, { success: false, error: e.message }); return; }
     const sb = body.config || {};
     sb.onDuty = sb.onDuty || { byDate: {}, byWeekday: {} };
-    sb.downloads = Array.isArray(sb.downloads) ? sb.downloads : [];
+    sb.downloads = Array.isArray(sb.downloads)
+      ? sb.downloads.map((item) => ({
+          name: cleanText(item && item.name, 50),
+          url: cleanText(item && item.url, 500),
+          // 下载方式多选：qr=扫码下载 direct=直接下载；旧数据无该字段时默认两种都开
+          methods: Array.isArray(item && item.methods)
+            ? (item.methods.filter((m) => m === 'qr' || m === 'direct'))
+            : ['qr', 'direct']
+        }))
+        .filter((item) => item.name || item.url)
+      : [];
     sb.faq = Array.isArray(sb.faq) ? sb.faq : [];
     // 人员设置：姓名与钉钉号，前端聊天窗口据此唤起钉钉单聊；isAdmin 勾选后可登录管理后台
     sb.staff = Array.isArray(sb.staff)

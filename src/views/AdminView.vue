@@ -81,7 +81,7 @@ function applySidebar(config = {}) {
   const duty = config.onDuty || {}
   sidebar.brand = { name: config.brand?.name || '', avatar: config.brand?.avatar || '', launcher: config.brand?.launcher || '' }
   sidebar.onDuty = { byDate: duty.byDate || {}, byWeekday: duty.byWeekday || {} }
-  sidebar.downloads = Array.isArray(config.downloads) ? config.downloads.map(item => ({ name: item.name || '', url: item.url || '' })) : []
+  sidebar.downloads = Array.isArray(config.downloads) ? config.downloads.map(item => ({ name: item.name || '', url: item.url || '', methods: Array.isArray(item.methods) ? item.methods : ['qr', 'direct'] })) : []
   sidebar.faq = Array.isArray(config.faq) ? config.faq.map(item => ({ q: item.q || '', a: item.a || '' })) : []
   sidebar.staff = Array.isArray(config.staff) ? config.staff.map(item => ({ name: item.name || '', dingtalkId: item.dingtalkId || '', isAdmin: Boolean(item.isAdmin), userId: item.userId || '' })) : []
   dutyText.value = formatDuty(sidebar.onDuty)
@@ -136,7 +136,13 @@ async function saveSidebar(message = '配置已保存') {
   } catch (error) { notice(error.message) }
   finally { saving.value = false }
 }
-function addDownload() { sidebar.downloads.push({ name: '', url: '' }) }
+function addDownload() { sidebar.downloads.push({ name: '', url: '', methods: ['qr', 'direct'] }) }
+function toggleDownloadMethod(item, method) {
+  const set = new Set(item.methods)
+  if (set.has(method)) set.delete(method)
+  else set.add(method)
+  item.methods = Array.from(set)
+}
 // ---------- 图片上传（机器人头像 / 悬浮按钮图）：请求体为原始图片字节，服务端落盘后返回 /uploads/ 地址 ----------
 function pickImage(field) {
   uploadTarget.value = field
@@ -278,8 +284,8 @@ onMounted(async () => {
         </section>
 
         <section v-if="active === 'downloads'" class="card">
-          <div class="card-head"><div><h2>下载汇总</h2><p>为聊天窗口配置常用客户端或资料下载地址。</p></div><button class="button secondary" type="button" @click="addDownload">添加下载项</button></div>
-          <div class="editable-list"><div v-for="(item, index) in sidebar.downloads" :key="index" class="editable-row"><input v-model="item.name" placeholder="显示名称"><input v-model="item.url" placeholder="https://…"><button type="button" aria-label="删除" @click="sidebar.downloads.splice(index, 1)">×</button></div><p v-if="!sidebar.downloads.length" class="empty">暂无下载项</p></div>
+          <div class="card-head"><div><h2>下载汇总</h2><p>为聊天窗口配置常用客户端或资料下载地址。每个下载项可勾选展示方式：二维码（手机扫码）和/或直接下载，都不勾选则聊天窗口中不显示该条目的操作按钮。</p></div><button class="button secondary" type="button" @click="addDownload">添加下载项</button></div>
+          <div class="editable-list"><div v-for="(item, index) in sidebar.downloads" :key="index" class="editable-row dl-row"><input v-model="item.name" placeholder="显示名称"><input v-model="item.url" placeholder="https://…"><span class="dl-methods"><label class="dl-method" title="展示扫码下载入口"><input type="checkbox" :checked="item.methods.includes('qr')" @change="toggleDownloadMethod(item, 'qr')"><i>二维码</i></label><label class="dl-method" title="展示直接下载入口"><input type="checkbox" :checked="item.methods.includes('direct')" @change="toggleDownloadMethod(item, 'direct')"><i>直接下载</i></label></span><button type="button" aria-label="删除" @click="sidebar.downloads.splice(index, 1)">×</button></div><p v-if="!sidebar.downloads.length" class="empty">暂无下载项</p></div>
           <div class="card-actions"><button class="button primary" type="button" :disabled="saving" @click="saveSidebar()">保存下载项</button></div>
         </section>
 

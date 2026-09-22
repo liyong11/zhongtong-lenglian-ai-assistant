@@ -39,8 +39,9 @@ const today = computed(() => {
   return { date, weekday, staff: duty.byDate?.[date] || duty.byWeekday?.[weekday] || [] }
 })
 const quickQuestions = computed(() => (sidebar.value.faq || []).slice(0, 5))
-// 常用下载（后台「下载汇总」配置）：每项提供「扫码下载」和「直接下载」两种方式
+// 常用下载（后台「下载汇总」配置）：每项的展示方式（扫码/直链）由后台勾选决定；旧数据无字段默认两种都开
 const downloads = computed(() => (sidebar.value.downloads || []).filter(item => item && item.name))
+const hasMethod = (item, method) => !Array.isArray(item.methods) || item.methods.includes(method)
 const qrPreview = ref({ name: '', image: '' })
 async function showQr(item) {
   if (!item.url) return
@@ -300,17 +301,18 @@ onUnmounted(() => {
               <div v-for="item in downloads" :key="item.name" class="download-item" :class="{ pending: !item.url }">
                 <span class="download-name" :title="item.url ? item.name : '链接待配置'">{{ item.name }}</span>
                 <div class="download-actions">
-                  <button v-if="item.url" type="button" class="download-act" title="查看下载二维码" :aria-label="`查看${item.name}下载二维码`" @click="showQr(item)">
+                  <button v-if="item.url && hasMethod(item, 'qr')" type="button" class="download-act" title="查看下载二维码" :aria-label="`查看${item.name}下载二维码`" @click="showQr(item)">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v.01M14 20v.01M17.5 17.5h.01M20 20v.01"/></svg>
                   </button>
                   <component
-                    :is="item.url ? 'a' : 'span'"
-                    :href="item.url || undefined"
-                    :title="item.url ? `直接下载${item.name}` : '链接待配置'"
-                    :aria-label="item.url ? `直接下载${item.name}` : undefined"
+                    :is="item.url && hasMethod(item, 'direct') ? 'a' : 'span'"
+                    v-if="item.url && hasMethod(item, 'direct')"
+                    :href="item.url"
+                    :title="`直接下载${item.name}`"
+                    :aria-label="`直接下载${item.name}`"
                     class="download-act"
-                    :target="item.url ? '_blank' : undefined"
-                    :rel="item.url ? 'noopener' : undefined"
+                    target="_blank"
+                    rel="noopener"
                     @click.stop
                   >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 21h16"/></svg>
