@@ -119,16 +119,18 @@ a.staff-ding:hover{background:#d0f1ee;color:#08655f}
 .mobile-duty{display:none;flex:none;align-items:center;gap:8px;padding:12px 14px 0;overflow-x:auto;-webkit-overflow-scrolling:touch}
 .mobile-duty-label{flex:none;color:var(--ink-4);font-size:11px;font-weight:800;letter-spacing:.06em}
 .mobile-duty-staff{display:flex;gap:6px}
-/* 窄屏「常用下载」折叠条：侧栏隐藏时的下载入口，默认收起不挤占对话区 */
-.mobile-downloads{display:none;flex:none;border-bottom:1px solid var(--border);background:#fbfdfd}
-.mobile-downloads-head{width:100%;display:flex;align-items:center;gap:7px;padding:11px 14px;border:0;background:transparent;color:var(--ink-3);font-size:11px;font-weight:800;letter-spacing:.08em;cursor:pointer;text-align:left;transition:color .15s var(--ease)}
-.mobile-downloads-head:hover{color:var(--ink-2)}
-.mobile-downloads-title{display:flex;align-items:center;gap:6px}
-.mobile-downloads-title::before{content:"";width:3px;height:10px;border-radius:2px;background:linear-gradient(180deg,#1cb5a9,#0b8078)}
-.mobile-downloads-count{padding:1px 7px;border-radius:999px;background:#eef2f6;color:var(--ink-3);font-size:10.5px;font-weight:700;letter-spacing:0}
-.mobile-downloads-head svg{margin-left:auto;width:15px;height:15px;transition:transform .18s var(--ease)}
-.mobile-downloads-head[aria-expanded="true"] svg{transform:rotate(180deg)}
-.mobile-downloads .download-list{max-height:38vh;margin:0 14px 10px;padding:4px 8px;overflow-y:auto;border:1px solid var(--border);border-radius:12px;background:#fff;scrollbar-width:thin}
+/* 窄屏「常用下载」：内容区首位的主操作折叠卡，白底描边 + 图标，默认收起 */
+.mobile-downloads{display:none;flex:none;padding:10px 12px;border-bottom:1px solid var(--border);background:#fff}
+.mobile-downloads-head{width:100%;display:flex;align-items:center;gap:9px;min-height:44px;padding:8px 12px;border:1px solid rgba(15,159,149,.28);border-radius:12px;background:linear-gradient(135deg,#f2fbfa,var(--primary-soft));cursor:pointer;text-align:left;transition:border-color .15s var(--ease),box-shadow .15s var(--ease)}
+.mobile-downloads-head:hover{border-color:var(--primary);box-shadow:0 3px 10px -2px rgba(15,159,149,.25)}
+.mobile-downloads-head:active{transform:scale(.99)}
+.mobile-downloads-icon{flex:none;display:grid;place-items:center;width:28px;height:28px;border-radius:9px;background:linear-gradient(145deg,#1cb5a9,#087f78);color:#fff;box-shadow:0 3px 8px -2px rgba(8,127,120,.4)}
+.mobile-downloads-icon svg{width:15px;height:15px}
+.mobile-downloads-title{font-size:13.5px;font-weight:750;color:var(--ink)}
+.mobile-downloads-count{padding:1px 8px;border-radius:999px;background:rgba(15,159,149,.15);color:var(--primary-strong);font-size:11px;font-weight:750}
+.mobile-downloads-chev{flex:none;margin-left:auto;width:16px;height:16px;color:var(--primary-strong);transition:transform .18s var(--ease)}
+.mobile-downloads-head[aria-expanded="true"] .mobile-downloads-chev{transform:rotate(180deg)}
+.mobile-downloads .download-list{max-height:38vh;margin:8px 2px 2px;padding:4px 8px;overflow-y:auto;border:1px solid var(--border);border-radius:12px;background:#fff;box-shadow:var(--shadow-s);scrollbar-width:thin}
 .quick-link{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px;margin-bottom:2px;border:0;border-radius:10px;background:transparent;color:var(--ink-2);text-align:left;font-size:13.5px;cursor:pointer;transition:background .15s var(--ease),color .15s var(--ease)}
 .quick-link:last-child{margin-bottom:-4px}
 .quick-link span{flex:none;display:grid;place-items:center;width:18px;height:18px;border-radius:50%;background:#eef2f6;color:var(--ink-4);font-size:12px;line-height:1;transition:background .15s var(--ease),color .15s var(--ease)}

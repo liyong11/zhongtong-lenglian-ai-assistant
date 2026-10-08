@@ -324,21 +324,15 @@ onUnmounted(() => {
         </aside>
 
         <main class="conversation">
-          <div v-if="today.staff.length" class="mobile-duty">
-            <span class="mobile-duty-label">今日值班</span>
-            <div class="mobile-duty-staff">
-              <template v-for="name in today.staff" :key="name">
-                <a v-if="dingtalkLink(name)" :href="dingtalkLink(name)" class="staff-ding" :title="`钉钉联系${name}`" :aria-label="`钉钉联系${name}`">{{ name }}</a>
-                <span v-else>{{ name }}</span>
-              </template>
-            </div>
-          </div>
-          <!-- 窄屏（侧栏隐藏时）的下载入口：折叠条默认收起，展开后复用下载列表 -->
+          <!-- 窄屏（侧栏隐藏时）的下载入口：置于最顶部的醒目折叠卡，默认收起，展开后复用下载列表 -->
           <div v-if="downloads.length" class="mobile-downloads">
             <button type="button" class="mobile-downloads-head" :aria-expanded="mobileDlOpen" @click="mobileDlOpen = !mobileDlOpen">
+              <span class="mobile-downloads-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 21h16"/></svg>
+              </span>
               <span class="mobile-downloads-title">常用下载</span>
               <span class="mobile-downloads-count">{{ downloads.length }}</span>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+              <svg class="mobile-downloads-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
             </button>
             <div v-show="mobileDlOpen" class="download-list">
               <div v-for="item in downloads" :key="item.name" class="download-item" :class="{ pending: !item.url }">
@@ -347,6 +341,15 @@ onUnmounted(() => {
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 21h16"/></svg>
                 </button>
               </div>
+            </div>
+          </div>
+          <div v-if="today.staff.length" class="mobile-duty">
+            <span class="mobile-duty-label">今日值班</span>
+            <div class="mobile-duty-staff">
+              <template v-for="name in today.staff" :key="name">
+                <a v-if="dingtalkLink(name)" :href="dingtalkLink(name)" class="staff-ding" :title="`钉钉联系${name}`" :aria-label="`钉钉联系${name}`">{{ name }}</a>
+                <span v-else>{{ name }}</span>
+              </template>
             </div>
           </div>
           <div ref="messageList" class="message-list" aria-live="polite">
