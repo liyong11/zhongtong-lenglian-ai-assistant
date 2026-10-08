@@ -344,6 +344,9 @@ onUnmounted(() => {
             </div>
           </div>
           <div v-if="today.staff.length" class="mobile-duty">
+            <span class="mobile-duty-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
+            </span>
             <span class="mobile-duty-label">今日值班</span>
             <div class="mobile-duty-staff">
               <template v-for="name in today.staff" :key="name">

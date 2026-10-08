@@ -116,11 +116,15 @@ a.staff-ding:hover{background:#d0f1ee;color:#08655f}
 .dl-dialog-qr small{color:var(--ink-3);font-size:11.5px}
 .dl-dialog-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;width:100%;padding:12px 18px;border-radius:12px;font-size:14px}
 .dl-dialog-btn svg{width:17px;height:17px}
-.mobile-duty{display:none;flex:none;align-items:center;gap:8px;padding:12px 14px 0;overflow-x:auto;-webkit-overflow-scrolling:touch}
-.mobile-duty-label{flex:none;color:var(--ink-4);font-size:11px;font-weight:800;letter-spacing:.06em}
+/* 窄屏「今日值班」：与下载卡同族的辅助信息卡，图标用软色底弱化层级 */
+.mobile-duty{display:none;flex:none;align-items:center;gap:9px;margin:0 12px 10px;padding:8px 12px;border:1px solid var(--border);border-radius:12px;background:#fff;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.mobile-duty::-webkit-scrollbar{display:none}
+.mobile-duty-icon{flex:none;display:grid;place-items:center;width:28px;height:28px;border-radius:9px;background:var(--primary-soft);color:var(--primary-strong)}
+.mobile-duty-icon svg{width:15px;height:15px}
+.mobile-duty-label{flex:none;color:var(--ink);font-size:13.5px;font-weight:750}
 .mobile-duty-staff{display:flex;gap:6px}
 /* 窄屏「常用下载」：内容区首位的主操作折叠卡，白底描边 + 图标，默认收起 */
-.mobile-downloads{display:none;flex:none;padding:10px 12px;border-bottom:1px solid var(--border);background:#fff}
+.mobile-downloads{display:none;flex:none;padding:10px 12px;background:#fff}
 .mobile-downloads-head{width:100%;display:flex;align-items:center;gap:9px;min-height:44px;padding:8px 12px;border:1px solid rgba(15,159,149,.28);border-radius:12px;background:linear-gradient(135deg,#f2fbfa,var(--primary-soft));cursor:pointer;text-align:left;transition:border-color .15s var(--ease),box-shadow .15s var(--ease)}
 .mobile-downloads-head:hover{border-color:var(--primary);box-shadow:0 3px 10px -2px rgba(15,159,149,.25)}
 .mobile-downloads-head:active{transform:scale(.99)}
