@@ -59,6 +59,8 @@ function closeDownload() {
   dlPreview.value = null
   dlQrImage.value = ''
 }
+// 窄屏下侧栏整体隐藏，「常用下载」在消息区顶部以折叠条出现，默认收起避免挤占对话空间
+const mobileDlOpen = ref(false)
 
 // 机器人形象：名称与头像（头像为图片 URL 时渲染图片，否则渲染文字/表情）
 const title = computed(() => urlTitle || sidebar.value.brand?.name || '小冷')
@@ -329,6 +331,22 @@ onUnmounted(() => {
                 <a v-if="dingtalkLink(name)" :href="dingtalkLink(name)" class="staff-ding" :title="`钉钉联系${name}`" :aria-label="`钉钉联系${name}`">{{ name }}</a>
                 <span v-else>{{ name }}</span>
               </template>
+            </div>
+          </div>
+          <!-- 窄屏（侧栏隐藏时）的下载入口：折叠条默认收起，展开后复用下载列表 -->
+          <div v-if="downloads.length" class="mobile-downloads">
+            <button type="button" class="mobile-downloads-head" :aria-expanded="mobileDlOpen" @click="mobileDlOpen = !mobileDlOpen">
+              <span class="mobile-downloads-title">常用下载</span>
+              <span class="mobile-downloads-count">{{ downloads.length }}</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+            <div v-show="mobileDlOpen" class="download-list">
+              <div v-for="item in downloads" :key="item.name" class="download-item" :class="{ pending: !item.url }">
+                <span class="download-name" :title="item.url ? item.name : '链接待配置'">{{ item.name }}</span>
+                <button v-if="item.url" type="button" class="download-act" title="下载" :aria-label="`下载${item.name}`" @click="openDownload(item)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 21h16"/></svg>
+                </button>
+              </div>
             </div>
           </div>
           <div ref="messageList" class="message-list" aria-live="polite">
