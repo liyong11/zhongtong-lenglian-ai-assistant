@@ -123,18 +123,6 @@ a.staff-ding:hover{background:#d0f1ee;color:#08655f}
 .mobile-duty-icon svg{width:15px;height:15px}
 .mobile-duty-label{flex:none;color:var(--ink);font-size:13.5px;font-weight:750}
 .mobile-duty-staff{display:flex;gap:6px}
-/* 窄屏「常用下载」：与值班卡同族的轻量折叠卡，白底默认收起，展开才见列表 */
-.mobile-downloads{display:none;flex:none;padding:10px 12px 0;background:#fff}
-.mobile-downloads-head{width:100%;display:flex;align-items:center;gap:9px;min-height:44px;padding:8px 12px;border:1px solid var(--border);border-radius:12px;background:#fff;cursor:pointer;text-align:left;transition:border-color .15s var(--ease),background .15s var(--ease)}
-.mobile-downloads-head:hover{border-color:var(--border-strong);background:var(--soft)}
-.mobile-downloads-head:active{transform:scale(.99)}
-.mobile-downloads-icon{flex:none;display:grid;place-items:center;width:28px;height:28px;border-radius:9px;background:linear-gradient(145deg,#1cb5a9,#087f78);color:#fff;box-shadow:0 3px 8px -2px rgba(8,127,120,.4)}
-.mobile-downloads-icon svg{width:15px;height:15px}
-.mobile-downloads-title{font-size:13.5px;font-weight:750;color:var(--ink)}
-.mobile-downloads-count{padding:1px 8px;border-radius:999px;background:#eef2f6;color:var(--ink-3);font-size:11px;font-weight:700}
-.mobile-downloads-chev{flex:none;margin-left:auto;width:16px;height:16px;color:var(--ink-4);transition:transform .18s var(--ease)}
-.mobile-downloads-head[aria-expanded="true"] .mobile-downloads-chev{transform:rotate(180deg)}
-.mobile-downloads .download-list{max-height:38vh;margin:8px 2px 2px;padding:4px 8px;overflow-y:auto;border:1px solid var(--border);border-radius:12px;background:#fff;box-shadow:var(--shadow-s);scrollbar-width:thin}
 .quick-link{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px;margin-bottom:2px;border:0;border-radius:10px;background:transparent;color:var(--ink-2);text-align:left;font-size:13.5px;cursor:pointer;transition:background .15s var(--ease),color .15s var(--ease)}
 .quick-link:last-child{margin-bottom:-4px}
 .quick-link span{flex:none;display:grid;place-items:center;width:18px;height:18px;border-radius:50%;background:#eef2f6;color:var(--ink-4);font-size:12px;line-height:1;transition:background .15s var(--ease),color .15s var(--ease)}
@@ -153,6 +141,20 @@ a.staff-ding:hover{background:#d0f1ee;color:#08655f}
 .message-bubble{max-width:78%;padding:11px 14px;border:1px solid var(--border);border-radius:4px 16px 16px 16px;background:#fff;color:var(--ink-2);font-size:14px;line-height:1.7;white-space:normal;word-break:break-word;box-shadow:var(--shadow-s)}
 .message.assistant .message-bubble.streaming{border-color:rgba(15,159,149,.32)}
 .message.user .message-bubble{border:0;border-radius:16px 4px 16px 16px;background:linear-gradient(135deg,#14a89d,var(--primary-strong));color:#fff;font-weight:500;box-shadow:0 6px 18px -6px rgba(11,128,120,.45)}
+
+/* 欢迎消息内嵌快捷操作：常用下载（青色胶囊）+ 常见问题（白色胶囊） */
+.message.welcome .message-bubble{max-width:88%}
+.welcome-group{margin-top:11px;padding-top:10px;border-top:1px dashed var(--border)}
+.welcome-label{display:block;margin-bottom:7px;color:var(--ink-4);font-size:11px;font-weight:800;letter-spacing:.06em}
+.welcome-actions{display:flex;flex-wrap:wrap;gap:6px}
+.welcome-dl{display:inline-flex;align-items:center;gap:5px;max-width:100%;padding:6px 11px;border:1px solid rgba(15,159,149,.35);border-radius:999px;background:var(--primary-soft);color:var(--primary-strong);font-size:12px;font-weight:650;cursor:pointer;transition:border-color .15s var(--ease)}
+.welcome-dl svg{flex:none;width:12px;height:12px}
+.welcome-dl span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.welcome-dl:hover:not(:disabled){border-color:var(--primary)}
+.welcome-dl:active:not(:disabled){transform:scale(.97)}
+.welcome-dl:disabled{border-color:var(--border);background:#fff;color:var(--ink-4);cursor:default}
+.welcome-faq{max-width:100%;padding:6px 11px;border:1px solid var(--border);border-radius:999px;background:#fff;color:var(--ink-2);font-size:12px;cursor:pointer;transition:border-color .15s var(--ease),color .15s var(--ease),background .15s var(--ease)}
+.welcome-faq:hover{border-color:var(--primary);background:var(--primary-soft);color:var(--primary-strong)}
 
 .thought-panel{margin:0 0 8px;border:1px solid var(--border);border-radius:10px;background:var(--soft);overflow:hidden}
 .thought-head{width:100%;display:flex;align-items:center;gap:6px;padding:8px 11px;border:0;background:transparent;color:var(--ink-3);font-size:13px;font-weight:650;cursor:pointer;text-align:left}
@@ -215,8 +217,6 @@ a.staff-ding:hover{background:#d0f1ee;color:#08655f}
 @keyframes typing-bounce{0%,60%,100%{transform:translateY(0);opacity:.45}30%{transform:translateY(-4px);opacity:1}}
 .stream-cursor{display:inline-block;width:2px;height:1.1em;margin-left:3px;vertical-align:-.18em;border-radius:2px;background:var(--primary);box-shadow:0 0 6px rgba(15,159,149,.6);animation:cursor-blink .9s steps(1,end) infinite}
 @keyframes cursor-blink{0%,45%{opacity:1}46%,100%{opacity:0}}
-
-.mobile-quick{display:none}
 
 .composer{margin:14px;border:1px solid var(--border-strong);border-radius:16px;background:#fff;box-shadow:0 4px 18px rgba(15,31,45,.05);overflow:hidden;transition:border-color .15s var(--ease),box-shadow .15s var(--ease)}
 .composer:focus-within{border-color:var(--primary);box-shadow:0 0 0 4px var(--primary-ring)}
@@ -390,11 +390,6 @@ code{padding:2px 5px;border-radius:5px;background:#f1f5f9;color:var(--primary-de
   .chat-aside{display:none}
   .header-duty{display:none}
   .mobile-duty{display:flex}
-  .mobile-downloads{display:block}
-  .mobile-quick{display:flex;gap:8px;padding:10px 14px 0;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
-  .mobile-quick::-webkit-scrollbar{display:none}
-  .mobile-quick button{flex:none;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:7px 12px;border:1px solid var(--border);border-radius:999px;background:#fff;color:var(--primary-strong);font-size:12px;font-weight:600;cursor:pointer}
-  .mobile-quick button:active{background:var(--primary-soft)}
   .chat-window{right:10px;bottom:10px;width:calc(100vw - 20px);height:calc(100vh - 20px)}
   .composer{margin:10px}
   .message-list{padding:16px}
