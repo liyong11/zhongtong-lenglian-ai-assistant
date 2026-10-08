@@ -59,6 +59,8 @@ function closeDownload() {
   dlPreview.value = null
   dlQrImage.value = ''
 }
+// 窄屏下侧栏整体隐藏，「常用下载」以轻量折叠卡放在内容区顶部，默认收起（操作不高频，不抢视觉）
+const mobileDlOpen = ref(false)
 
 // 机器人形象：名称与头像（头像为图片 URL 时渲染图片，否则渲染文字/表情）
 const title = computed(() => urlTitle || sidebar.value.brand?.name || '小冷')
@@ -322,6 +324,25 @@ onUnmounted(() => {
         </aside>
 
         <main class="conversation">
+          <!-- 窄屏（侧栏隐藏时）的下载入口：轻量折叠卡，默认收起一行，展开复用下载列表 -->
+          <div v-if="downloads.length" class="mobile-downloads">
+            <button type="button" class="mobile-downloads-head" :aria-expanded="mobileDlOpen" @click="mobileDlOpen = !mobileDlOpen">
+              <span class="mobile-downloads-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 21h16"/></svg>
+              </span>
+              <span class="mobile-downloads-title">常用下载</span>
+              <span class="mobile-downloads-count">{{ downloads.length }}</span>
+              <svg class="mobile-downloads-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+            <div v-show="mobileDlOpen" class="download-list">
+              <div v-for="item in downloads" :key="item.name" class="download-item" :class="{ pending: !item.url }">
+                <span class="download-name" :title="item.url ? item.name : '链接待配置'">{{ item.name }}</span>
+                <button v-if="item.url" type="button" class="download-act" title="下载" :aria-label="`下载${item.name}`" @click="openDownload(item)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 21h16"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
           <div v-if="today.staff.length" class="mobile-duty">
             <span class="mobile-duty-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
@@ -364,16 +385,6 @@ onUnmounted(() => {
                 <span v-else-if="message.pending" class="stream-cursor" aria-hidden="true"></span>
               </div>
             </div>
-          </div>
-          <!-- 窄屏下载入口：胶囊行置于快捷问题上方，点击直接弹下载弹窗 -->
-          <div v-if="downloads.length" class="mobile-downloads">
-            <template v-for="item in downloads" :key="item.name">
-              <button v-if="item.url" type="button" class="dl-chip" :title="`下载${item.name}`" :aria-label="`下载${item.name}`" @click="openDownload(item)">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 21h16"/></svg>
-                <span>{{ item.name }}</span>
-              </button>
-              <span v-else class="dl-chip pending" :title="item.name + '：链接待配置'">{{ item.name }}</span>
-            </template>
           </div>
           <div v-if="quickQuestions.length" class="mobile-quick">
             <button v-for="item in quickQuestions.slice(0, 4)" :key="item.q" type="button" @click="send(item.q)">{{ item.q }}</button>
