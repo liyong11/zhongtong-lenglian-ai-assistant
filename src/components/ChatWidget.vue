@@ -87,6 +87,75 @@ function dingtalkLink(name) {
 function notify(state) {
   if (embedded) window.parent.postMessage({ source: 'zto-ai-widget', type: 'resize', state }, parentOrigin)
 }
+
+// ---------- 悬浮球拖动：按住拖换位、松手吸附左右边缘并记忆；位移小于阈值视为点击 ----------
+const LAUNCHER_SIZE = 64
+const LAUNCHER_MARGIN = 8
+const launcherEl = ref(null)
+const launcherPos = ref(null) // { left, bottom }；null 时走 CSS 默认右下角
+const launcherDragging = ref(false)
+let launcherDrag = null
+let launcherClickSuppressed = false
+const launcherStyle = computed(() => launcherPos.value
+  ? { left: `${launcherPos.value.left}px`, right: 'auto', bottom: `${launcherPos.value.bottom}px` }
+  : null)
+function clampLauncher(left, bottom) {
+  return {
+    left: Math.min(Math.max(left, LAUNCHER_MARGIN), window.innerWidth - LAUNCHER_SIZE - LAUNCHER_MARGIN),
+    bottom: Math.min(Math.max(bottom, LAUNCHER_MARGIN), window.innerHeight - LAUNCHER_SIZE - LAUNCHER_MARGIN),
+  }
+}
+function onLauncherDown(event) {
+  if (launcherDrag || (event.pointerType === 'mouse' && event.button !== 0)) return
+  launcherClickSuppressed = false // 新手势开始：清除上次拖动遗留的点击抑制，避免吞掉正常点击
+  const rect = launcherEl.value.getBoundingClientRect()
+  launcherDrag = {
+    startX: event.clientX,
+    startY: event.clientY,
+    offsetInX: event.clientX - rect.left,
+    offsetInY: event.clientY - rect.top,
+    moved: false,
+  }
+  try { launcherEl.value.setPointerCapture(event.pointerId) } catch { /* 合成事件无活动 pointer：拖拽逻辑照常 */ }
+}
+function onLauncherMove(event) {
+  if (!launcherDrag) return
+  if (!launcherDrag.moved && Math.hypot(event.clientX - launcherDrag.startX, event.clientY - launcherDrag.startY) < 5) return
+  if (!launcherDrag.moved) { launcherDrag.moved = true; launcherDragging.value = true }
+  const pos = clampLauncher(event.clientX - launcherDrag.offsetInX, window.innerHeight - (event.clientY - launcherDrag.offsetInY) - LAUNCHER_SIZE)
+  launcherPos.value = pos
+}
+function onLauncherUp() {
+  if (!launcherDrag) return
+  const moved = launcherDrag.moved
+  launcherDrag = null
+  if (!moved) return // 原地松手：交给 click 打开对话
+  launcherClickSuppressed = true
+  // 吸附到更近的左右边缘：先保持 dragging（无过渡）落位，再去掉类让吸附平滑动画
+  const snapLeft = launcherPos.value.left + LAUNCHER_SIZE / 2 <= window.innerWidth / 2
+    ? LAUNCHER_MARGIN
+    : window.innerWidth - LAUNCHER_SIZE - LAUNCHER_MARGIN
+  launcherPos.value = { ...launcherPos.value, left: snapLeft }
+  try { localStorage.setItem('zto-launcher-pos', JSON.stringify(launcherPos.value)) } catch {}
+  requestAnimationFrame(() => { launcherDragging.value = false })
+}
+function onLauncherClick() {
+  if (launcherClickSuppressed) { launcherClickSuppressed = false; return }
+  openChat()
+}
+function restoreLauncherPos(attempt = 0) {
+  // 视口尚未就绪（如隐藏面板加载）时钳位会得到负坐标，延迟重试
+  if (window.innerWidth < 200 || window.innerHeight < 200) {
+    if (attempt < 5) setTimeout(() => restoreLauncherPos(attempt + 1), 300)
+    return
+  }
+  try {
+    const saved = JSON.parse(localStorage.getItem('zto-launcher-pos') || 'null')
+    if (saved && Number.isFinite(saved.left) && Number.isFinite(saved.bottom)) {
+      launcherPos.value = clampLauncher(saved.left, saved.bottom)
+    }
+  } catch { /* 无记忆或隐私模式：走默认右下角 */ }
+}
 function openChat() {
   open.value = true
   if (!messages.value.length) messages.value.push(makeWelcome())
@@ -224,6 +293,7 @@ async function send(question = input.value) {
 
 onMounted(async () => {
   clockTimer = setInterval(() => { nowTick.value = Date.now() }, 30 * 1000)
+  restoreLauncherPos()
   if (full) openChat()
   notify('collapsed')
   // 回答里的图片点击放大预览（v-html 内容无法直接绑定，走事件委托）
@@ -250,7 +320,7 @@ onUnmounted(() => {
 
 <template>
   <div class="widget-root" :class="{ embedded, maximized, full }">
-    <button v-if="!open" class="launcher" type="button" aria-label="打开智能助理" @click="openChat">
+    <button v-if="!open" ref="launcherEl" class="launcher" :class="{ dragging: launcherDragging }" :style="launcherStyle" type="button" aria-label="打开智能助理" @pointerdown="onLauncherDown" @pointermove="onLauncherMove" @pointerup="onLauncherUp" @pointercancel="onLauncherUp" @click="onLauncherClick">
       <span class="launcher-mark"><img v-if="launcherIsImage" :src="launcherImage" alt=""><template v-else>{{ launcherText }}</template></span>
       <span class="launcher-pulse" />
     </button>

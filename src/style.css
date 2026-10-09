@@ -34,9 +34,11 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 
 /* ============ Widget ============ */
 .widget-root{min-height:100%;pointer-events:none}
-.launcher{position:fixed;right:24px;bottom:24px;width:64px;height:64px;border:0;border-radius:21px;background:linear-gradient(140deg,#1cb5a9,#087f78);box-shadow:0 14px 34px rgba(8,127,120,.35),inset 0 1px 0 rgba(255,255,255,.28);color:#fff;cursor:pointer;pointer-events:auto;display:grid;place-items:center;transition:transform .18s var(--ease),box-shadow .18s var(--ease)}
+.launcher{position:fixed;right:24px;bottom:24px;width:64px;height:64px;border:0;border-radius:21px;background:linear-gradient(140deg,#1cb5a9,#087f78);box-shadow:0 14px 34px rgba(8,127,120,.35),inset 0 1px 0 rgba(255,255,255,.28);color:#fff;cursor:grab;pointer-events:auto;display:grid;place-items:center;transition:transform .18s var(--ease),box-shadow .18s var(--ease),left .22s var(--ease),bottom .22s var(--ease);touch-action:none}
 .launcher:hover{transform:translateY(-3px);box-shadow:0 20px 44px rgba(8,127,120,.42),inset 0 1px 0 rgba(255,255,255,.28)}
 .launcher:active{transform:translateY(-1px) scale(.96)}
+.launcher.dragging{cursor:grabbing;transition:none;box-shadow:0 22px 48px rgba(8,127,120,.45)}
+.launcher.dragging:hover,.launcher.dragging:active{transform:none}
 .embedded .launcher{right:8px;bottom:8px}
 .launcher-mark{display:grid;place-items:center;width:40px;height:40px;border:1px solid rgba(255,255,255,.5);border-radius:15px;background:rgba(255,255,255,.13);font-size:15px;font-weight:800;letter-spacing:.04em;overflow:hidden}
 .launcher-mark img{width:100%;height:100%;object-fit:cover;border-radius:inherit}
@@ -419,5 +421,6 @@ code{padding:2px 5px;border-radius:5px;background:#f1f5f9;color:var(--primary-de
 @media(prefers-reduced-motion:reduce){
   .typing i,.stream-cursor,.launcher-pulse,.thought-live{animation:none}
   .chat-window,.admin-toast,.login-card,.login-logo,.login-page::before{animation:none}
+  .launcher{transition:none}
   .launcher:hover,.launcher:active,.button.primary:hover:not(:disabled),.composer-footer button:hover:not(:disabled){transform:none}
 }
