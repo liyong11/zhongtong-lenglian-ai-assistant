@@ -167,23 +167,13 @@ a.staff-ding:hover{background:#d0f1ee;color:#08655f}
 .thought-body{max-height:300px;overflow-y:auto;margin:0 11px;padding:9px 2px 10px 11px;border-left:2px solid #dbe3ea;color:var(--ink-3);font-size:13px;line-height:1.75;white-space:pre-wrap;word-break:break-word;scrollbar-width:thin}
 @keyframes thought-breathe{0%,100%{opacity:.3;transform:scale(.85)}50%{opacity:1;transform:scale(1)}}
 
-/* 生成过程面板：✦ 标题 + 绿圈对勾步骤，仿钉钉智能客服样式 */
+/* 生成过程状态：真实两态（思考中→已生成答案），思考正文在「深度思考」面板 */
 .process-panel{margin:0 0 8px;border:1px solid var(--border);border-radius:10px;background:var(--soft);overflow:hidden}
-.process-head{width:100%;display:flex;align-items:center;gap:6px;padding:8px 11px;border:0;background:transparent;color:var(--ink-2);font-size:13px;font-weight:650;cursor:pointer;text-align:left}
+.process-head{display:flex;align-items:center;gap:6px;padding:8px 11px;color:var(--ink-2);font-size:13px;font-weight:650}
 .process-head:hover{color:#1e293b}
 .process-mark{color:var(--primary);font-size:13px}
 .process-panel:not(.done) .process-mark{animation:thought-breathe 1.1s ease-in-out infinite}
 .process-title{flex:1}
-.process-chevron{font-size:11px;color:var(--ink-4)}
-.process-steps{margin:0;padding:2px 11px 9px 13px;list-style:none}
-.process-steps li{display:flex;align-items:center;gap:8px;margin:5px 0;color:var(--ink-4);font-size:12.5px}
-.process-steps li i{flex:none;width:15px;height:15px;border-radius:50%;border:1.5px solid #d4dde5;background:#fff;position:relative}
-.process-steps li.running{color:var(--ink-2)}
-.process-steps li.running i{border-color:var(--primary)}
-.process-steps li.running i::after{content:"";position:absolute;inset:3px;border-radius:50%;background:var(--primary);animation:thought-breathe 1.1s ease-in-out infinite}
-.process-steps li.done{color:var(--ink-2)}
-.process-steps li.done i{border-color:var(--primary);background:var(--primary)}
-.process-steps li.done i::after{content:"";position:absolute;left:4.5px;top:1.5px;width:4px;height:8px;border:solid #fff;border-width:0 1.8px 1.8px 0;transform:rotate(45deg)}
 
 .message-markdown>:first-child{margin-top:0}
 .message-markdown>:last-child{margin-bottom:0}

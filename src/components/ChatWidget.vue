@@ -16,7 +16,6 @@ const open = ref(false)
 const maximized = ref(false)
 const loading = ref(false)
 const online = ref(false)
-const appMode = ref(true) // 智能体应用模式（带知识库检索）时过程面板多一步「知识检索」
 const input = ref('')
 const sessionId = ref(null)
 const messages = ref([])
@@ -218,25 +217,7 @@ function chunkText(data) {
   return ''
 }
 
-// ---------- 生成过程面板：步骤随流式进度点亮，完成后标题变「已为您生成答案」 ----------
-function makeSteps() {
-  const steps = [{ label: '问题理解完成', done: true }]
-  if (appMode.value) steps.push({ label: '知识检索完成', done: false })
-  steps.push({ label: '内容梳理完成', done: false }, { label: '答案整合完成', done: false })
-  return steps
-}
-// 等待期间每 550ms 点亮一步（停在最后一项之前，那步等流结束）
-function startStepTimer(answer) {
-  const timer = setInterval(() => {
-    const next = answer.steps.find(step => !step.done)
-    if (!next || next === answer.steps[answer.steps.length - 1]) { clearInterval(timer); return }
-    next.done = true
-  }, 550)
-  return timer
-}
-function fastForwardSteps(answer) {
-  for (let i = 0; i < answer.steps.length - 1; i++) answer.steps[i].done = true
-}
+// ---------- 生成过程状态：真实进度（思考流来自应用 thoughts，不再用定时器模拟步骤） ----------
 async function send(question = input.value) {
   const prompt = String(question || '').trim()
   if (!prompt || loading.value) return
@@ -245,11 +226,10 @@ async function send(question = input.value) {
   const history = messages.value
     .filter(message => message.content && (message.role === 'user' || message.role === 'assistant'))
     .map(message => ({ role: message.role, content: message.content }))
-  const answer = { role: 'assistant', content: '', displayContent: '', pending: true, done: false, animationId: 0, thought: '', thoughtOpen: false, steps: makeSteps(), stepsCollapsed: false }
+  const answer = { role: 'assistant', content: '', displayContent: '', pending: true, done: false, animationId: 0, thought: '', thoughtOpen: false }
   messages.value.push(answer)
   startAnswerAnimation(answer)
   loading.value = true
-  const stepTimer = startStepTimer(answer)
   await scrollToBottom()
 
   try {
@@ -266,11 +246,15 @@ async function send(question = input.value) {
         if (!answer.content) answer.thoughtOpen = true
       }
       if (event === 'chunk') {
-        // 首个回答分片到达：前面的准备步骤视为已完成，进入最终整合
-        if (!answer.content && !answer.steps[answer.steps.length - 1].done) fastForwardSteps(answer)
-        answer.content += chunkText(data)
+        // replace：代理发现之前下发的文本其实是规划叙述（检索边界回滚），整段重置
+        if (data.replace) {
+          answer.content = typeof data.text === 'string' ? data.text : ''
+          if (answer.displayContent.length > answer.content.length) answer.displayContent = answer.content
+        } else {
+          answer.content += chunkText(data)
+        }
         if (data.session_id) sessionId.value = data.session_id
-        if (answer.thoughtOpen) answer.thoughtOpen = false
+        if (!data.replace && answer.thoughtOpen) answer.thoughtOpen = false
       }
       if (event === 'done' && data.session_id) sessionId.value = data.session_id
       if (event === 'error') streamError = data.error || 'AI 服务异常'
@@ -280,10 +264,7 @@ async function send(question = input.value) {
     if (!answer.content) answer.content = '暂时没有获取到回复，请稍后重试。'
   } catch (error) {
     answer.content = `请求失败：${error.message}`
-    answer.steps = [] // 失败的请求不展示“已解答”过程
   } finally {
-    clearInterval(stepTimer)
-    for (const step of answer.steps) step.done = true
     answer.done = true
     startAnswerAnimation(answer)
     loading.value = false
@@ -307,7 +288,6 @@ onMounted(async () => {
     const [ping, config] = await Promise.all([fetch('/api/ping'), fetch('/api/sidebar')])
     const pingData = await ping.json()
     online.value = pingData.configured === true
-    appMode.value = pingData.mode !== 'model'
     const data = await config.json()
     if (data.success) sidebar.value = data.config || sidebar.value
   } catch { online.value = false }
@@ -412,17 +392,12 @@ onUnmounted(() => {
             <div v-for="(message, index) in messages" :key="index" class="message" :class="[message.role, { welcome: message.welcome }]">
               <span class="message-avatar">{{ message.role === 'assistant' ? 'AI' : '我' }}</span>
               <div class="message-bubble" :class="{ streaming: message.pending }">
-                <div v-if="message.role === 'assistant' && message.steps && message.steps.length" class="process-panel" :class="{ done: message.done }">
-                  <button type="button" class="process-head" :aria-expanded="!message.stepsCollapsed" @click="message.stepsCollapsed = !message.stepsCollapsed">
+                <div v-if="message.role === 'assistant' && !message.welcome && (message.pending || message.done)" class="process-panel" :class="{ done: message.done }">
+                  <div class="process-head">
                     <span class="process-mark" aria-hidden="true">✦</span>
-                    <span class="process-title">{{ message.done ? title + '已为您生成答案' : '正在生成答案' }}</span>
-                    <span class="process-chevron" aria-hidden="true">{{ message.stepsCollapsed ? '﹀' : '︿' }}</span>
-                  </button>
-                  <ul v-show="!message.stepsCollapsed" class="process-steps">
-                    <li v-for="(step, i) in message.steps" :key="i" :class="{ done: step.done, running: !step.done && (i === 0 || message.steps[i - 1].done) }">
-                      <i aria-hidden="true"></i><span>{{ step.label }}</span>
-                    </li>
-                  </ul>
+                    <span class="process-title">{{ message.done ? title + '已为您生成答案' : '正在思考与检索知识…' }}</span>
+                    <i v-if="message.pending" class="thought-live" aria-label="处理中" />
+                  </div>
                 </div>
                 <div v-if="message.role === 'assistant' && message.thought" class="thought-panel" :class="{ open: message.thoughtOpen }">
                   <button type="button" class="thought-head" :aria-expanded="message.thoughtOpen" @click="message.thoughtOpen = !message.thoughtOpen">

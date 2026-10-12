@@ -364,6 +364,11 @@ async function callAppStream(cfg, prompt, sessionId, res) {
   let charCount = 0;
   let finishReason = '';
   let sentThought = '';
+  // 智能体应用会把模型的规划叙述（“用户询问…我需要先检索知识库…”）混在 output.text 里；
+  // 真回答从 thoughts 数量增加的边界之后开始（检索/工具执行完）。边界前的文本转投思考通道，
+  // 边界后的文本照常流式下发；若出现新边界（多步工具），回滚已下的“回答”重新归入思考。
+  let thoughtCount = 0;
+  let pendingAnswer = '';
   let clientGone = false;
   res.on('close', () => {
     if (!res.writableEnded) {
@@ -386,18 +391,25 @@ async function callAppStream(cfg, prompt, sessionId, res) {
     if (out.session_id) currentSession = out.session_id;
     if (parsed.data.usage) usage = parsed.data.usage;
     if (out.finish_reason) finishReason = out.finish_reason;
-    // 思考过程：thoughts 可能整段重发也可能增量，按前缀对齐后只发增量，对不齐则整段替换
-    const thoughts = Array.isArray(out.thoughts) ? out.thoughts.map((t) => (t && t.thought) || '').join('') : '';
+    // 思考过程：thoughts 可能整段重发也可能增量，按前缀对齐后只发增量，对不齐则整段追加
+    const thArr = Array.isArray(out.thoughts) ? out.thoughts : null;
+    const thoughts = thArr ? thArr.map((t) => (t && t.thought) || '').join('') : '';
     if (thoughts) {
-      if (thoughts.startsWith(sentThought)) {
-        const suffix = thoughts.slice(sentThought.length);
-        if (suffix) { writeSse(res, 'thought', { text: suffix }); sentThought = thoughts; }
-      } else {
-        writeSse(res, 'thought', { text: thoughts, replace: true });
-        sentThought = thoughts;
+      const suffix = thoughts.startsWith(sentThought) ? thoughts.slice(sentThought.length) : thoughts;
+      if (suffix) { writeSse(res, 'thought', { text: suffix }); sentThought = thoughts; }
+    }
+    // 思考边界：thoughts 数量增加 → 此前乐观下发的“回答”其实是上一步的规划叙述，回滚并转投思考
+    const thCount = thArr ? thArr.length : thoughtCount;
+    if (thCount > thoughtCount) {
+      thoughtCount = thCount;
+      if (pendingAnswer) {
+        writeSse(res, 'chunk', { text: '', replace: true, session_id: currentSession });
+        writeSse(res, 'thought', { text: '\n\n' + pendingAnswer });
+        pendingAnswer = '';
       }
     }
     if (text) {
+      pendingAnswer += text;
       writeSse(res, 'chunk', { text: text, session_id: currentSession });
       chunkCount++;
       charCount += text.length;
