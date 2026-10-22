@@ -66,22 +66,37 @@
       "2026-09-30": [
         "乔羽",
         "韩刚"
+      ],
+      "2026-10-08": [
+        "李勇",
+        "韩刚"
+      ],
+      "2026-10-09": [
+        "乔羽"
+      ],
+      "2026-10-10": [
+        "李勇",
+        "乔羽"
       ]
     },
-    "byWeekday": {}
+    "byWeekday": {
+      "周四": [
+        "侯鹏"
+      ]
+    }
   },
   "downloads": [
     {
       "name": "PDA下载",
-      "url": ""
+      "url": "https://example.com/download/pda-app.apk"
     },
     {
       "name": "鲸小宝(安卓)",
-      "url": ""
+      "url": "https://example.com/download/jingxiaobao-android.apk"
     },
     {
       "name": "鲸小宝(苹果)",
-      "url": ""
+      "url": "https://example.com/download/jingxiaobao-ios.mobileconfig"
     }
   ],
   "faq": [
