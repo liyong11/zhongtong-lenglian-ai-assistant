@@ -63,6 +63,7 @@
   }
   // 视口变化（缩放/旋转/窗口调整）后重新钳位，避免记忆位置或聊天窗落到屏幕外
   let widgetState = 'collapsed' // 'collapsed'（悬浮球）| 'open'（聊天窗）| 'maximized'
+  let lastOpenPos = null // 最近一次展开态位置：最大化还原时回到原位，而不是以全屏 rect 为锚
   window.addEventListener('resize', () => {
     if (widgetState === 'collapsed') {
       if (launcherPos) applyLauncherPos()
@@ -78,32 +79,30 @@
     // maximized 铺满视口，无需处理
   })
 
-  // ---------- 悬浮球拖动：iframe 内 pointer capture 独占事件流，widget 每帧转发指针坐标（可能越界），这里换算成宿主页面坐标移动 iframe ----------
+  // ---------- 悬浮球拖动：iframe 内 pointer capture 独占事件流，逐帧转发屏幕坐标 ----------
   // 指针按下发生在 iframe 文档内且被 capture 独占，父页面拿不到原生事件；
-  // 但 capture 保证了指针移出 iframe 后流不中断，故坐标 = iframe 视口坐标（可为负/超界），
-  // 加上 iframe 当前实际 rect 即得宿主坐标，逐帧换算无累积误差。
-  let drag = null // { startLeft, startTop, pointer0: { x, y }, moved }
-  let lastOpenPos = null // 最近一次展开态位置：最大化还原时回到原位，而不是以全屏 rect 为锚
-  function onDragStart(pointerX, pointerY) {
+  // screenX/screenY 相对屏幕、与 iframe 自身位置无关，用它做锚定逐帧定位，
+  // 不存在"坐标系随拖动移动"的反馈漂移，也不在拖动中途改动 iframe 尺寸。
+  let drag = null // { startLeft, startBottom, s0: { x, y }, moved }
+  function onDragStart(sX, sY) {
+    if (drag) return
     const rect = frame.getBoundingClientRect()
     drag = {
       startLeft: rect.left,
-      startTop: rect.top,
-      pointer0: { x: rect.left + pointerX, y: rect.top + pointerY },
+      startBottom: window.innerHeight - rect.top - rect.height,
+      s0: { x: sX, y: sY },
       moved: false,
     }
     frame.style.transition = 'none'
   }
-  function onDragMove(pointerX, pointerY) {
+  function onDragMove(sX, sY) {
     if (!drag) return
-    const rect = frame.getBoundingClientRect()
-    const hostX = rect.left + pointerX
-    const hostY = rect.top + pointerY
     drag.moved = true
     launcherPos = clampPos(
-      drag.startLeft + hostX - drag.pointer0.x,
-      window.innerHeight - drag.startTop - LAUNCHER_SIZE + drag.pointer0.y - hostY,
+      drag.startLeft + sX - drag.s0.x,
+      drag.startBottom - (sY - drag.s0.y),
     )
+    frame.style.top = 'auto'
     frame.style.left = `${launcherPos.left}px`
     frame.style.right = 'auto'
     frame.style.bottom = `${launcherPos.bottom}px`
@@ -132,8 +131,8 @@
     const message = event.data
     if (!message || message.source !== 'zto-ai-widget') return
     if (message.type === 'launcher-drag') {
-      if (message.state === 'start') onDragStart(message.pointerX, message.pointerY)
-      else if (message.state === 'move') onDragMove(message.pointerX, message.pointerY)
+      if (message.state === 'start') onDragStart(message.sX, message.sY)
+      else if (message.state === 'move') onDragMove(message.sX, message.sY)
       else if (message.state === 'end') onDragEnd()
       return
     }

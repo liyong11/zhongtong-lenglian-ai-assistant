@@ -88,6 +88,8 @@ function notify(state) {
 }
 
 // ---------- 悬浮球拖动：按住拖换位、松手吸附左右边缘并记忆；位移小于阈值视为点击 ----------
+// 嵌入模式：iframe 内 pointer capture 独占事件流（指针移出 iframe 也不中断），
+// 逐帧把 screenX/screenY 转发给外层 embed.js，由其移动整个 iframe 并按站点记忆位置
 const LAUNCHER_SIZE = 64
 const LAUNCHER_MARGIN = 8
 const launcherEl = ref(null)
@@ -122,9 +124,9 @@ function onLauncherMove(event) {
   if (!launcherDrag.moved && Math.hypot(event.clientX - launcherDrag.startX, event.clientY - launcherDrag.startY) < 5) return
   if (!launcherDrag.moved) { launcherDrag.moved = true; launcherDragging.value = true }
   if (embedded) {
-    // 嵌入模式：iframe 仅 80×80，内部拖不动 —— pointer capture 在本元素上，指针移出 iframe 流不中断，
-    // 把每帧坐标（可能越界）转发给外层 embed.js，由其按 iframe 实际位置换算宿主坐标并移动整个 iframe
-    window.parent.postMessage({ source: 'zto-ai-widget', type: 'launcher-drag', state: launcherDrag.relayed ? 'move' : 'start', pointerX: event.clientX, pointerY: event.clientY }, parentOrigin)
+    // 嵌入模式：iframe 仅 80×80，内部拖不动 —— pointer capture 在本元素上，指针移出 iframe 流不中断；
+    // 逐帧转发 screenX/screenY（相对屏幕，与 iframe 自身位置无关），外层据此移动整个 iframe，无反馈漂移
+    window.parent.postMessage({ source: 'zto-ai-widget', type: 'launcher-drag', state: launcherDrag.relayed ? 'move' : 'start', sX: event.screenX, sY: event.screenY }, parentOrigin)
     launcherDrag.relayed = true
     return
   }
