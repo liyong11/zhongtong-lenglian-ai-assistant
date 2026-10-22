@@ -121,6 +121,13 @@ function onLauncherMove(event) {
   if (!launcherDrag) return
   if (!launcherDrag.moved && Math.hypot(event.clientX - launcherDrag.startX, event.clientY - launcherDrag.startY) < 5) return
   if (!launcherDrag.moved) { launcherDrag.moved = true; launcherDragging.value = true }
+  if (embedded) {
+    // 嵌入模式：iframe 仅 80×80，内部拖不动 —— pointer capture 在本元素上，指针移出 iframe 流不中断，
+    // 把每帧坐标（可能越界）转发给外层 embed.js，由其按 iframe 实际位置换算宿主坐标并移动整个 iframe
+    window.parent.postMessage({ source: 'zto-ai-widget', type: 'launcher-drag', state: launcherDrag.relayed ? 'move' : 'start', pointerX: event.clientX, pointerY: event.clientY }, parentOrigin)
+    launcherDrag.relayed = true
+    return
+  }
   const pos = clampLauncher(event.clientX - launcherDrag.offsetInX, window.innerHeight - (event.clientY - launcherDrag.offsetInY) - LAUNCHER_SIZE)
   launcherPos.value = pos
 }
@@ -130,6 +137,12 @@ function onLauncherUp() {
   launcherDrag = null
   if (!moved) return // 原地松手：交给 click 打开对话
   launcherClickSuppressed = true
+  if (embedded) {
+    // 嵌入模式：通知外层结束拖动（吸附边缘与位置记忆都在外层完成）
+    window.parent.postMessage({ source: 'zto-ai-widget', type: 'launcher-drag', state: 'end' }, parentOrigin)
+    requestAnimationFrame(() => { launcherDragging.value = false })
+    return
+  }
   // 吸附到更近的左右边缘：先保持 dragging（无过渡）落位，再去掉类让吸附平滑动画
   const snapLeft = launcherPos.value.left + LAUNCHER_SIZE / 2 <= window.innerWidth / 2
     ? LAUNCHER_MARGIN
@@ -143,6 +156,8 @@ function onLauncherClick() {
   openChat()
 }
 function restoreLauncherPos(attempt = 0) {
+  // 嵌入模式：悬浮球位置由外层 embed.js 记忆与移动，iframe 内保持默认右下角
+  if (embedded) return
   // 视口尚未就绪（如隐藏面板加载）时钳位会得到负坐标，延迟重试
   if (window.innerWidth < 200 || window.innerHeight < 200) {
     if (attempt < 5) setTimeout(() => restoreLauncherPos(attempt + 1), 300)
@@ -300,7 +315,7 @@ onUnmounted(() => {
 
 <template>
   <div class="widget-root" :class="{ embedded, maximized, full }">
-    <button v-if="!open" ref="launcherEl" class="launcher" :class="{ dragging: launcherDragging }" :style="launcherStyle" type="button" aria-label="打开智能助理" @pointerdown="onLauncherDown" @pointermove="onLauncherMove" @pointerup="onLauncherUp" @pointercancel="onLauncherUp" @click="onLauncherClick">
+    <button v-if="!open" ref="launcherEl" class="launcher" :class="{ dragging: launcherDragging }" :style="launcherStyle" type="button" aria-label="打开智能助理" @pointerdown="onLauncherDown" @pointermove="onLauncherMove" @pointerup="onLauncherUp" @pointercancel="onLauncherUp" @lostpointercapture="onLauncherUp" @click="onLauncherClick">
       <span class="launcher-mark"><img v-if="launcherIsImage" :src="launcherImage" alt=""><template v-else>{{ launcherText }}</template></span>
       <span class="launcher-pulse" />
     </button>
