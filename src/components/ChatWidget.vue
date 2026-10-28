@@ -93,7 +93,7 @@ function notify(state) {
   window.parent.postMessage({ source: 'zto-ai-widget', type: 'resize', state }, parentOrigin)
 }
 
-// ---------- 悬浮球拖动：按住拖换位、松手吸附左右边缘并记忆；位移小于阈值视为点击 ----------
+// ---------- 悬浮球拖动：按住拖换位，松手停在原处（不吸附）并按站点记忆；位移小于阈值视为点击 ----------
 // 嵌入模式：pointerdown 即请外层把 iframe 展开为全屏透明层（expand 回告后坐标系=宿主视口），
 // 拖动全程在 iframe 内部原生进行（无跨文档逐帧转发，零延迟零漂移）；松手吸附后上报球位并收回小框。
 const LAUNCHER_SIZE = 64
@@ -150,13 +150,8 @@ function onLauncherUp() {
   if (!moved) return // 原地松手：交给 click 打开对话
   launcherClickSuppressed = true
   if (!launcherPos.value) { launcherDragging.value = false; return } // expand 未到达即松手：位置未变，仅抑制误点击
-  // 吸附到更近的左右边缘：先保持 dragging（无过渡）落位，再去掉类让吸附平滑动画
-  const snapLeft = launcherPos.value.left + LAUNCHER_SIZE / 2 <= window.innerWidth / 2
-    ? LAUNCHER_MARGIN
-    : window.innerWidth - LAUNCHER_SIZE - LAUNCHER_MARGIN
-  launcherPos.value = { ...launcherPos.value, left: snapLeft }
+  // 不吸附：球停在用户松手的位置（已钳位不出视口），按站点记忆
   if (embedded) {
-    // 上报最终球位（外层存宿主域并收回 80×80 小框），随后复位待机状态
     window.parent.postMessage({ source: 'zto-ai-widget', type: 'launcher-pos', left: launcherPos.value.left, bottom: launcherPos.value.bottom }, parentOrigin)
     notify('collapsed')
   } else {
