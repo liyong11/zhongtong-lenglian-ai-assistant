@@ -71,13 +71,48 @@
     frame.style.transition = 'none'
     Object.assign(frame.style, { top: '0', left: '0', right: '0', bottom: '0', width: '100vw', height: '100vh' })
   }
+  // ---------- 聊天窗位置：拖动后记忆（宿主域 localStorage），否则默认在球上方 ----------
+  let chatPosMem = loadChatPos()
+  let chatDrag = null
+  function loadChatPos() {
+    try {
+      const s = JSON.parse(localStorage.getItem('zto-ai-chat-pos') || 'null')
+      if (s && Number.isFinite(s.left) && Number.isFinite(s.bottom)) return s
+    } catch { /* 无记忆 */ }
+    return null
+  }
   function applyOpen() {
-    // 聊天窗锚定球当前位置，保证完整可见
+    // 聊天窗默认在球上方（下缘=球顶上方12px，不压球与球下方按钮）；拖动过则用记忆位置
     const vw = window.innerWidth, vh = window.innerHeight
     const width = Math.min(760, vw - 32), height = Math.min(660, vh - 32)
-    const left = clamp(ballPos.left - INSET, MARGIN, vw - width - MARGIN)
-    const bottom = clamp(ballPos.bottom - INSET, MARGIN, vh - height - MARGIN)
+    let left, bottom
+    if (chatPosMem) {
+      left = clamp(chatPosMem.left, MARGIN, vw - width - MARGIN)
+      bottom = clamp(chatPosMem.bottom, MARGIN, vh - height - MARGIN)
+    } else {
+      left = clamp(ballPos.left - INSET, MARGIN, vw - width - MARGIN)
+      bottom = clamp(ballPos.bottom + 76, MARGIN, vh - height - MARGIN)
+    }
     place(left, bottom, 'min(760px, calc(100vw - 32px))', 'min(660px, calc(100vh - 32px))')
+  }
+  // 标题栏拖动：widget 逐帧转发屏幕坐标，按 delta 移动 iframe（与悬浮球拖动同思路，无漂移）
+  function onChatDragStart(sX, sY) {
+    const rect = frame.getBoundingClientRect()
+    chatDrag = { startLeft: rect.left, startBottom: window.innerHeight - rect.top - rect.height, w: rect.width, h: rect.height, s0: { x: sX, y: sY }, moved: false }
+  }
+  function onChatDragMove(sX, sY) {
+    if (!chatDrag) return
+    chatDrag.moved = true
+    const left = clamp(chatDrag.startLeft + sX - chatDrag.s0.x, MARGIN, window.innerWidth - chatDrag.w - MARGIN)
+    const bottom = clamp(chatDrag.startBottom - (sY - chatDrag.s0.y), MARGIN, window.innerHeight - chatDrag.h - MARGIN)
+    chatPosMem = { left, bottom }
+    place(left, bottom, `${chatDrag.w}px`, `${chatDrag.h}px`)
+  }
+  function onChatDragEnd() {
+    if (chatDrag && chatDrag.moved && chatPosMem) {
+      try { localStorage.setItem('zto-ai-chat-pos', JSON.stringify(chatPosMem)) } catch { /* 隐私模式 */ }
+    }
+    chatDrag = null
   }
 
   // 视口变化后按当前状态重新钳位
@@ -95,6 +130,12 @@
     // 用户点了隐藏：整个 iframe 移除显示（不持久化，刷新页面 embed.js 重新创建即恢复）
     if (m.type === 'hide') {
       frame.style.display = 'none'
+      return
+    }
+    if (m.type === 'chat-drag') {
+      if (m.state === 'start') onChatDragStart(m.sX, m.sY)
+      else if (m.state === 'move') onChatDragMove(m.sX, m.sY)
+      else if (m.state === 'end') onChatDragEnd()
       return
     }
     // 大动作（跳水/喷水）：临时扩框给动作空间，保持球屏幕位置不动，动作完缩回

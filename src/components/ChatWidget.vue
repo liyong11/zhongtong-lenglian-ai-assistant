@@ -239,6 +239,60 @@ function openChat() {
   if (!messages.value.length) messages.value.push(makeWelcome())
   notify(maximized.value ? 'maximized' : 'open')
 }
+
+// ---------- 聊天窗拖动：按住标题栏移动位置；standalone 直接改窗口 left/bottom，嵌入转发给外层移动 iframe ----------
+const chatPos = ref(null) // standalone 拖动后的窗口位置 { left, bottom }；null 走默认
+const chatWindowStyle = computed(() => {
+  if (embedded || maximized.value) return null // 嵌入窗口铺满 iframe（位置外层管）、最大化全屏，均由 CSS 控制
+  if (chatPos.value) return { left: `${chatPos.value.left}px`, right: 'auto', bottom: `${chatPos.value.bottom}px` }
+  return null
+})
+let chatDrag = null
+function onChatHeaderDown(event) {
+  if (maximized.value || (event.pointerType === 'mouse' && event.button !== 0)) return
+  if (event.target.closest('button, a, input, textarea')) return // 标题栏按钮/链接不启动拖动
+  const rect = event.currentTarget.closest('.chat-window').getBoundingClientRect()
+  chatDrag = {
+    startX: event.clientX, startY: event.clientY,
+    startLeft: rect.left, startBottom: window.innerHeight - rect.top - rect.height,
+    w: rect.width, h: rect.height, moved: false,
+  }
+  try { event.currentTarget.setPointerCapture(event.pointerId) } catch { /* 合成事件无活动 pointer */ }
+  if (embedded) {
+    window.parent.postMessage({ source: 'zto-ai-widget', type: 'chat-drag', state: 'start', sX: event.screenX, sY: event.screenY }, parentOrigin)
+  }
+}
+function onChatHeaderMove(event) {
+  if (!chatDrag) return
+  if (!chatDrag.moved && Math.hypot(event.clientX - chatDrag.startX, event.clientY - chatDrag.startY) < 4) return
+  chatDrag.moved = true
+  if (embedded) {
+    window.parent.postMessage({ source: 'zto-ai-widget', type: 'chat-drag', state: 'move', sX: event.screenX, sY: event.screenY }, parentOrigin)
+    return
+  }
+  chatPos.value = {
+    left: Math.min(Math.max(chatDrag.startLeft + event.clientX - chatDrag.startX, 8), Math.max(8, window.innerWidth - chatDrag.w - 8)),
+    bottom: Math.min(Math.max(chatDrag.startBottom - (event.clientY - chatDrag.startY), 8), Math.max(8, window.innerHeight - chatDrag.h - 8)),
+  }
+}
+function onChatHeaderUp() {
+  if (!chatDrag) return
+  const moved = chatDrag.moved
+  chatDrag = null
+  if (embedded) {
+    window.parent.postMessage({ source: 'zto-ai-widget', type: 'chat-drag', state: 'end' }, parentOrigin)
+    return
+  }
+  if (moved && chatPos.value) {
+    try { localStorage.setItem('zto-chat-pos', JSON.stringify(chatPos.value)) } catch { /* 隐私模式 */ }
+  }
+}
+// standalone 打开时恢复上次拖动的位置
+try {
+  const saved = JSON.parse(localStorage.getItem('zto-chat-pos') || 'null')
+  if (saved && Number.isFinite(saved.left) && Number.isFinite(saved.bottom)) chatPos.value = saved
+} catch { /* 无记忆 */ }
+
 // 欢迎消息：文本下内嵌「常用下载 / 常见问题」可点按钮（welcome 标记驱动模板渲染）
 function makeWelcome(text = `你好，我是${title.value}。可以问我订单查询、异常处理和操作指引。`) {
   return { role: 'assistant', content: text, welcome: true }
@@ -421,8 +475,8 @@ onUnmounted(() => {
       </span>
     </button>
 
-    <section v-if="open" class="chat-window" :class="{ maximized }" aria-label="智能助理对话窗口">
-      <header class="chat-header">
+    <section v-if="open" class="chat-window" :class="{ maximized }" :style="chatWindowStyle" aria-label="智能助理对话窗口">
+      <header class="chat-header chat-drag-handle" @pointerdown="onChatHeaderDown" @pointermove="onChatHeaderMove" @pointerup="onChatHeaderUp" @pointercancel="onChatHeaderUp" @lostpointercapture="onChatHeaderUp">
         <div class="bot-identity">
           <span class="bot-avatar" :class="{ 'has-image': avatarIsImage }"><img v-if="avatarIsImage" :src="avatar" alt=""><template v-else>{{ avatarText }}</template></span>
           <span><b>{{ title }}</b><small><i :class="{ online }" />{{ online ? '服务正常' : '服务未配置' }}</small></span>
