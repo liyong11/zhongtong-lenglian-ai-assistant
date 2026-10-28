@@ -70,21 +70,39 @@ const launcherIsImage = computed(() => /^(https?:|data:image|\/uploads\/)/i.test
 const launcherImage = computed(() => launcher.value || avatar.value)
 const launcherText = computed(() => launcher.value || avatarText.value)
 
-// 眨眼帧：与 launcher 图同目录的 -blink 后缀文件（预加载成功才启用，后台换图无该帧则自动不眨）
+// 眨眼帧：与 launcher 图同目录的 -half（半眯）/-blink（全闭）后缀文件，预加载成功才启用
+const halfImage = computed(() => launcherIsImage.value ? launcherImage.value.replace(/(\.\w+)$/, '-half$1') : '')
 const blinkImage = computed(() => launcherIsImage.value ? launcherImage.value.replace(/(\.\w+)$/, '-blink$1') : '')
+const halfReady = ref(false)
 const blinkReady = ref(false)
-const blinking = ref(false)
-const launcherSrc = computed(() => (blinking.value && blinkReady.value) ? blinkImage.value : launcherImage.value)
+const blinkPhase = ref('') // '' 睁眼 | 'half' 半眯 | 'blink' 全闭
+const launcherSrc = computed(() => {
+  if (blinkPhase.value === 'half' && halfReady.value) return halfImage.value
+  if (blinkPhase.value === 'blink' && blinkReady.value) return blinkImage.value
+  return launcherImage.value
+})
 let blinkTimer = 0
-function scheduleBlink() {
-  // 每 2.8~5.2 秒随机眨一次，闭眼 180ms；减少动态偏好时不眨
-  blinkTimer = setTimeout(() => {
-    if (blinkReady.value) {
-      blinking.value = true
-      setTimeout(() => { blinking.value = false }, 180)
+function playBlink() {
+  // 睁→半眯→全闭→半眯→睁，渐变序列比单帧硬切柔和；20% 概率连眨两下
+  const seq = halfReady.value ? ['half', 'blink', 'half'] : ['blink']
+  const durations = halfReady.value ? [70, 110, 70] : [180]
+  let i = 0
+  const step = () => {
+    if (i < seq.length) {
+      blinkPhase.value = seq[i]
+      setTimeout(step, durations[i]); i++
+    } else {
+      blinkPhase.value = ''
+      if (Math.random() < 0.2) setTimeout(playBlink, 240)
     }
+  }
+  step()
+}
+function scheduleBlink() {
+  blinkTimer = setTimeout(() => {
+    if (blinkReady.value) playBlink()
     scheduleBlink()
-  }, 2800 + Math.random() * 2400)
+  }, 3000 + Math.random() * 2500)
 }
 
 // 人员钉钉号映射：{ 姓名: 钉钉号 }，配置后点击姓名可唤起钉钉单聊
@@ -341,8 +359,11 @@ onMounted(async () => {
     online.value = pingData.configured === true
     const data = await config.json()
     if (data.success) sidebar.value = data.config || sidebar.value
-    // 眨眼：预加载闭眼帧（存在才启用），成功后开始定时眨眼
+    // 眨眼：预加载半眯/全闭帧（存在才启用），成功后开始定时眨眼
     if (launcherIsImage.value && blinkImage.value && !reduceMotion) {
+      const preHalf = new Image()
+      preHalf.onload = () => { halfReady.value = true }
+      preHalf.src = halfImage.value
       const pre = new Image()
       pre.onload = () => { blinkReady.value = true; scheduleBlink() }
       pre.src = blinkImage.value
