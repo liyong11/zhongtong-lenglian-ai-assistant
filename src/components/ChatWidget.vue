@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { renderMessage } from '../renderMessage.mjs'
 import { consumeSseStream } from '../streamResponse.mjs'
+import { createLauncherAnim } from '../launcherAnim.js'
 
 const params = new URLSearchParams(location.search)
 // 名称优先级：嵌入方显式传参 title > 后台「机器人形象」配置 > 默认“小冷”
@@ -134,6 +135,12 @@ function notify(state) {
 const LAUNCHER_SIZE = 64
 const LAUNCHER_MARGIN = 8
 const launcherEl = ref(null)
+const launcherMarkEl = ref(null)
+const launcherHover = ref(false)
+let launcherAnim = null
+const canLauncherAnim = computed(() =>
+  launcherIsImage.value && !reduceMotion && !open.value && !launcherHidden.value && !launcherHiding.value && !launcherDragging.value && !launcherHover.value
+)
 const launcherPos = ref(null) // { left, bottom }；null 时走 CSS 默认位置
 const launcherDragging = ref(false)
 let launcherDrag = null
@@ -383,10 +390,22 @@ onMounted(async () => {
       pre.src = blinkImage.value
     }
   } catch { online.value = false }
+  // 待机动画：呼吸浮沉 + 随机小动作/跳水/喷水（嵌入大动作临时扩框）
+  launcherAnim = createLauncherAnim({
+    getMark: () => launcherMarkEl.value,
+    getLauncher: () => launcherEl.value,
+    embedded,
+    parentOrigin,
+    canAnim: () => canLauncherAnim.value,
+    setAnimPos: pos => { launcherPos.value = pos },
+    clearAnimPos: () => { launcherPos.value = null },
+  })
+  launcherAnim.start()
 })
 onUnmounted(() => {
   clearInterval(clockTimer)
   clearTimeout(blinkTimer)
+  if (launcherAnim) launcherAnim.stop()
   if (imageClickListener) document.removeEventListener('click', imageClickListener)
   if (expandListener) window.removeEventListener('message', expandListener)
 })
@@ -394,8 +413,8 @@ onUnmounted(() => {
 
 <template>
   <div class="widget-root" :class="{ embedded, maximized, full }">
-    <button v-if="!open && !launcherHidden" ref="launcherEl" class="launcher" :class="{ dragging: launcherDragging, hiding: launcherHiding }" :style="launcherStyle" type="button" aria-label="打开智能助理" @pointerdown="onLauncherDown" @pointermove="onLauncherMove" @pointerup="onLauncherUp" @pointercancel="onLauncherUp" @lostpointercapture="onLauncherUp" @click="onLauncherClick">
-      <span class="launcher-mark"><img v-if="launcherIsImage" :src="launcherSrc" alt="" draggable="false"><template v-else>{{ launcherText }}</template></span>
+    <button v-if="!open && !launcherHidden" ref="launcherEl" class="launcher" :class="{ dragging: launcherDragging, hiding: launcherHiding }" :style="launcherStyle" type="button" aria-label="打开智能助理" @pointerdown="onLauncherDown" @pointermove="onLauncherMove" @pointerup="onLauncherUp" @pointercancel="onLauncherUp" @lostpointercapture="onLauncherUp" @click="onLauncherClick" @mouseenter="launcherHover = true" @mouseleave="launcherHover = false">
+      <span ref="launcherMarkEl" class="launcher-mark"><img v-if="launcherIsImage" :src="launcherSrc" alt="" draggable="false"><template v-else>{{ launcherText }}</template></span>
       <span class="launcher-dismiss" role="button" tabindex="0" aria-label="隐藏悬浮球" title="隐藏" @click.stop="hideLauncher" @pointerdown.stop @pointermove.stop @pointerup.stop @keydown.enter.stop.prevent="hideLauncher" @keydown.space.stop.prevent="hideLauncher">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
       </span>

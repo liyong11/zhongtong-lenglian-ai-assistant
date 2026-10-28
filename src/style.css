@@ -48,6 +48,10 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 .launcher.dragging:hover,.launcher.dragging:active{transform:none}
 .embedded .launcher{right:8px;bottom:8px}
 .launcher-mark{position:absolute;inset:0;display:grid;place-items:center;border:0;background:transparent;font-size:22px;font-weight:800;letter-spacing:.04em;pointer-events:none}
+.launcher-mark.bob{animation:launcher-bob 3.4s ease-in-out infinite}
+.launcher-mark.acting{animation:none}
+@keyframes launcher-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+.anim-particle{position:absolute;border-radius:50%;pointer-events:none;z-index:3}
 .launcher-mark img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none;-webkit-user-drag:none;user-select:none;transform:scale(.8);transition:transform .22s var(--ease)}
 .launcher:hover .launcher-mark img{transform:scale(.86) rotate(-4deg)}
 .launcher.dragging .launcher-mark img{transform:scale(.84) rotate(5deg);transition:none}
@@ -430,6 +434,7 @@ code{padding:2px 5px;border-radius:5px;background:#f1f5f9;color:var(--primary-de
   .typing i,.stream-cursor,.thought-live{animation:none}
   .chat-window,.admin-toast,.login-card,.login-logo,.login-page::before{animation:none}
   .launcher{transition:none;animation:none}
+  .launcher-mark.bob{animation:none}
   .launcher-dismiss{transition:none}
   .launcher-mark img{transition:none}
   .launcher:hover .launcher-mark img,.launcher.dragging .launcher-mark img{transform:scale(.8)}
