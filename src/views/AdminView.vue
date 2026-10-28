@@ -40,6 +40,7 @@ const brandName = computed(() => sidebar.brand.name.trim() || '小冷')
 
 // 预设形象：点选填充头像与悬浮按钮图（-half/-blink 眨眼帧按同名约定自动配套），保存后生效
 const brandPresets = [
+  { id: 'whale', name: '虎鲸（吉祥物）', launcher: '/presets/whale.png', avatar: '/presets/whale.png' },
   { id: 'teal', name: '冷链青', launcher: '/presets/teal.png', avatar: '/presets/teal.png' },
   { id: 'blue', name: '经典蓝', launcher: '/presets/blue.png', avatar: '/presets/blue.png' },
 ]
