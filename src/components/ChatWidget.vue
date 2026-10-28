@@ -399,6 +399,7 @@ onMounted(async () => {
     canAnim: () => canLauncherAnim.value,
     setAnimPos: pos => { launcherPos.value = pos },
     clearAnimPos: () => { launcherPos.value = null },
+    setBlink: phase => { blinkPhase.value = phase },
   })
   launcherAnim.start()
 })
