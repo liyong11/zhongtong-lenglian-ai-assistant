@@ -196,6 +196,7 @@ function onLauncherUp() {
 }
 function onLauncherClick() {
   if (launcherClickSuppressed) { launcherClickSuppressed = false; return }
+  if (launcherHiding.value || launcherHidden.value) return // 隐藏过程中/已隐藏：不再打开对话
   openChat()
 }
 // 隐藏悬浮球：仅当前页面生效（不持久化），刷新后重新出现；消失带收缩淡出动画
@@ -205,6 +206,7 @@ function hideLauncher() {
   if (launcherHiding.value || launcherHidden.value) return
   launcherHiding.value = true
   launcherDrag = null // 取消进行中的拖动
+  open.value = false // 保险：若点击被误触发了打开，一并关闭，避免聊天窗残留
   setTimeout(() => {
     launcherHidden.value = true
     if (embedded) window.parent.postMessage({ source: 'zto-ai-widget', type: 'hide' }, parentOrigin)
@@ -399,7 +401,7 @@ onUnmounted(() => {
       </span>
     </button>
 
-    <section v-else class="chat-window" :class="{ maximized }" aria-label="智能助理对话窗口">
+    <section v-if="open" class="chat-window" :class="{ maximized }" aria-label="智能助理对话窗口">
       <header class="chat-header">
         <div class="bot-identity">
           <span class="bot-avatar"><img v-if="avatarIsImage" :src="avatar" alt=""><template v-else>{{ avatarText }}</template></span>
