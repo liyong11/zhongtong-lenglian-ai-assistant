@@ -63,7 +63,8 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 .chat-header{height:62px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 14px 0 18px;border-bottom:1px solid var(--border);background:linear-gradient(180deg,#fff,#fbfdfd)}
 .bot-identity{display:flex;align-items:center;gap:11px}
 .bot-avatar{width:38px;height:38px;border-radius:13px;display:grid;place-items:center;background:linear-gradient(145deg,#1cb5a9,#087f78);box-shadow:0 4px 12px -4px rgba(8,127,120,.5),inset 0 1px 0 rgba(255,255,255,.25);color:#fff;font-weight:800;font-size:13px;overflow:hidden}
-.bot-avatar img{width:100%;height:100%;object-fit:cover;border-radius:inherit}
+.bot-avatar img{width:100%;height:100%;object-fit:contain;border-radius:inherit}
+.bot-avatar.has-image{background:transparent;box-shadow:none}
 .bot-identity b{display:block;font-size:14px}
 .bot-identity small{display:flex;align-items:center;gap:5px;margin-top:3px;color:var(--ink-3);font-size:11px;font-weight:500}
 .bot-identity small i{width:7px;height:7px;border-radius:50%;background:#f59e0b}
@@ -147,6 +148,8 @@ a.staff-ding:hover{background:#d0f1ee;color:#08655f}
 .message.user{flex-direction:row-reverse}
 .message-avatar{width:28px;height:28px;flex:none;border-radius:9px;display:grid;place-items:center;background:linear-gradient(145deg,#1cb5a9,#087f78);color:#fff;font-size:10px;font-weight:800;box-shadow:0 3px 8px -2px rgba(8,127,120,.4)}
 .message.user .message-avatar{background:#e6ebf1;color:var(--ink-2);box-shadow:none}
+.message-avatar.has-image{background:transparent;box-shadow:none}
+.message-avatar img{width:100%;height:100%;object-fit:contain}
 .message-bubble{max-width:78%;padding:11px 14px;border:1px solid var(--border);border-radius:4px 16px 16px 16px;background:#fff;color:var(--ink-2);font-size:14px;line-height:1.7;white-space:normal;word-break:break-word;box-shadow:var(--shadow-s)}
 .message.assistant .message-bubble.streaming{border-color:rgba(15,159,149,.32)}
 .message.user .message-bubble{border:0;border-radius:16px 4px 16px 16px;background:linear-gradient(135deg,#14a89d,var(--primary-strong));color:#fff;font-weight:500;box-shadow:0 6px 18px -6px rgba(11,128,120,.45)}

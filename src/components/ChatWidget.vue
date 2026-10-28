@@ -404,7 +404,7 @@ onUnmounted(() => {
     <section v-if="open" class="chat-window" :class="{ maximized }" aria-label="智能助理对话窗口">
       <header class="chat-header">
         <div class="bot-identity">
-          <span class="bot-avatar"><img v-if="avatarIsImage" :src="avatar" alt=""><template v-else>{{ avatarText }}</template></span>
+          <span class="bot-avatar" :class="{ 'has-image': avatarIsImage }"><img v-if="avatarIsImage" :src="avatar" alt=""><template v-else>{{ avatarText }}</template></span>
           <span><b>{{ title }}</b><small><i :class="{ online }" />{{ online ? '服务正常' : '服务未配置' }}</small></span>
         </div>
         <!-- 今日技术支持：从侧栏上移到标题栏，人名可点发起钉钉单聊 -->
@@ -486,7 +486,7 @@ onUnmounted(() => {
           </div>
           <div ref="messageList" class="message-list" aria-live="polite">
             <div v-for="(message, index) in messages" :key="index" class="message" :class="[message.role, { welcome: message.welcome }]">
-              <span class="message-avatar">{{ message.role === 'assistant' ? 'AI' : '我' }}</span>
+              <span class="message-avatar" :class="{ 'has-image': message.role === 'assistant' && avatarIsImage }"><img v-if="message.role === 'assistant' && avatarIsImage" :src="avatar" alt=""><template v-else>{{ message.role === 'assistant' ? avatarText : '我' }}</template></span>
               <div class="message-bubble" :class="{ streaming: message.pending }">
                 <div v-if="message.role === 'assistant' && !message.welcome && (message.pending || message.done)" class="process-panel" :class="{ done: message.done }">
                   <div class="process-head">
