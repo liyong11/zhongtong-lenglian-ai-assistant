@@ -84,19 +84,27 @@ function dingtalkLink(name) {
 }
 
 function notify(state) {
-  if (embedded) window.parent.postMessage({ source: 'zto-ai-widget', type: 'resize', state }, parentOrigin)
+  if (!embedded) return
+  if (state === 'collapsed') {
+    // 收回小框：球回到 CSS 默认位置（由外层 iframe 定位决定），下次按下重新展开
+    launcherPos.value = null
+    expandReady = false
+  }
+  window.parent.postMessage({ source: 'zto-ai-widget', type: 'resize', state }, parentOrigin)
 }
 
 // ---------- 悬浮球拖动：按住拖换位、松手吸附左右边缘并记忆；位移小于阈值视为点击 ----------
-// 嵌入模式：iframe 内 pointer capture 独占事件流（指针移出 iframe 也不中断），
-// 逐帧把 screenX/screenY 转发给外层 embed.js，由其移动整个 iframe 并按站点记忆位置
+// 嵌入模式：pointerdown 即请外层把 iframe 展开为全屏透明层（expand 回告后坐标系=宿主视口），
+// 拖动全程在 iframe 内部原生进行（无跨文档逐帧转发，零延迟零漂移）；松手吸附后上报球位并收回小框。
 const LAUNCHER_SIZE = 64
 const LAUNCHER_MARGIN = 8
 const launcherEl = ref(null)
-const launcherPos = ref(null) // { left, bottom }；null 时走 CSS 默认右下角
+const launcherPos = ref(null) // { left, bottom }；null 时走 CSS 默认位置
 const launcherDragging = ref(false)
 let launcherDrag = null
 let launcherClickSuppressed = false
+let expandReady = false // 嵌入模式：外层已把 iframe 展开为全屏，可在内部原生拖动
+let expandListener = null
 const launcherStyle = computed(() => launcherPos.value
   ? { left: `${launcherPos.value.left}px`, right: 'auto', bottom: `${launcherPos.value.bottom}px` }
   : null)
@@ -122,14 +130,16 @@ function onLauncherDown(event) {
 function onLauncherMove(event) {
   if (!launcherDrag) return
   if (!launcherDrag.moved && Math.hypot(event.clientX - launcherDrag.startX, event.clientY - launcherDrag.startY) < 5) return
-  if (!launcherDrag.moved) { launcherDrag.moved = true; launcherDragging.value = true }
-  if (embedded) {
-    // 嵌入模式：iframe 仅 80×80，内部拖不动 —— pointer capture 在本元素上，指针移出 iframe 流不中断；
-    // 逐帧转发 screenX/screenY（相对屏幕，与 iframe 自身位置无关），外层据此移动整个 iframe，无反馈漂移
-    window.parent.postMessage({ source: 'zto-ai-widget', type: 'launcher-drag', state: launcherDrag.relayed ? 'move' : 'start', sX: event.screenX, sY: event.screenY }, parentOrigin)
-    launcherDrag.relayed = true
-    return
+  if (!launcherDrag.moved) {
+    launcherDrag.moved = true
+    launcherDragging.value = true
+    if (embedded) {
+      // 真正开始拖动才请外层展开全屏（点击路径不展开，无闪烁）；expand 回告后首帧按指针位置补偿
+      expandReady = false
+      window.parent.postMessage({ source: 'zto-ai-widget', type: 'prepare' }, parentOrigin)
+    }
   }
+  if (embedded && !expandReady) return // 等 expand 回告
   const pos = clampLauncher(event.clientX - launcherDrag.offsetInX, window.innerHeight - (event.clientY - launcherDrag.offsetInY) - LAUNCHER_SIZE)
   launcherPos.value = pos
 }
@@ -139,18 +149,19 @@ function onLauncherUp() {
   launcherDrag = null
   if (!moved) return // 原地松手：交给 click 打开对话
   launcherClickSuppressed = true
-  if (embedded) {
-    // 嵌入模式：通知外层结束拖动（吸附边缘与位置记忆都在外层完成）
-    window.parent.postMessage({ source: 'zto-ai-widget', type: 'launcher-drag', state: 'end' }, parentOrigin)
-    requestAnimationFrame(() => { launcherDragging.value = false })
-    return
-  }
+  if (!launcherPos.value) { launcherDragging.value = false; return } // expand 未到达即松手：位置未变，仅抑制误点击
   // 吸附到更近的左右边缘：先保持 dragging（无过渡）落位，再去掉类让吸附平滑动画
   const snapLeft = launcherPos.value.left + LAUNCHER_SIZE / 2 <= window.innerWidth / 2
     ? LAUNCHER_MARGIN
     : window.innerWidth - LAUNCHER_SIZE - LAUNCHER_MARGIN
   launcherPos.value = { ...launcherPos.value, left: snapLeft }
-  try { localStorage.setItem('zto-launcher-pos', JSON.stringify(launcherPos.value)) } catch {}
+  if (embedded) {
+    // 上报最终球位（外层存宿主域并收回 80×80 小框），随后复位待机状态
+    window.parent.postMessage({ source: 'zto-ai-widget', type: 'launcher-pos', left: launcherPos.value.left, bottom: launcherPos.value.bottom }, parentOrigin)
+    notify('collapsed')
+  } else {
+    try { localStorage.setItem('zto-launcher-pos', JSON.stringify(launcherPos.value)) } catch {}
+  }
   requestAnimationFrame(() => { launcherDragging.value = false })
 }
 function onLauncherClick() {
@@ -294,6 +305,17 @@ onMounted(async () => {
   restoreLauncherPos()
   if (full) openChat()
   notify('collapsed')
+  // 嵌入模式：外层展开全屏后回告球当前位置，重锚后开始内部原生拖动
+  if (embedded) {
+    expandListener = (event) => {
+      if (event.source !== window.parent) return
+      const m = event.data
+      if (!m || m.source !== 'zto-ai-widget' || m.type !== 'expand') return
+      launcherPos.value = { left: m.ballLeft, bottom: window.innerHeight - m.ballTop - LAUNCHER_SIZE }
+      expandReady = true
+    }
+    window.addEventListener('message', expandListener)
+  }
   // 回答里的图片点击放大预览（v-html 内容无法直接绑定，走事件委托）
   imageClickListener = (event) => {
     if (event.target instanceof HTMLElement && event.target.classList.contains('message-image')) {
@@ -312,13 +334,14 @@ onMounted(async () => {
 onUnmounted(() => {
   clearInterval(clockTimer)
   if (imageClickListener) document.removeEventListener('click', imageClickListener)
+  if (expandListener) window.removeEventListener('message', expandListener)
 })
 </script>
 
 <template>
   <div class="widget-root" :class="{ embedded, maximized, full }">
     <button v-if="!open" ref="launcherEl" class="launcher" :class="{ dragging: launcherDragging }" :style="launcherStyle" type="button" aria-label="打开智能助理" @pointerdown="onLauncherDown" @pointermove="onLauncherMove" @pointerup="onLauncherUp" @pointercancel="onLauncherUp" @lostpointercapture="onLauncherUp" @click="onLauncherClick">
-      <span class="launcher-mark"><img v-if="launcherIsImage" :src="launcherImage" alt=""><template v-else>{{ launcherText }}</template></span>
+      <span class="launcher-mark"><img v-if="launcherIsImage" :src="launcherImage" alt="" draggable="false"><template v-else>{{ launcherText }}</template></span>
       <span class="launcher-pulse" />
     </button>
 
