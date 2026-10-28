@@ -70,6 +70,23 @@ const launcherIsImage = computed(() => /^(https?:|data:image|\/uploads\/)/i.test
 const launcherImage = computed(() => launcher.value || avatar.value)
 const launcherText = computed(() => launcher.value || avatarText.value)
 
+// 眨眼帧：与 launcher 图同目录的 -blink 后缀文件（预加载成功才启用，后台换图无该帧则自动不眨）
+const blinkImage = computed(() => launcherIsImage.value ? launcherImage.value.replace(/(\.\w+)$/, '-blink$1') : '')
+const blinkReady = ref(false)
+const blinking = ref(false)
+const launcherSrc = computed(() => (blinking.value && blinkReady.value) ? blinkImage.value : launcherImage.value)
+let blinkTimer = 0
+function scheduleBlink() {
+  // 每 2.8~5.2 秒随机眨一次，闭眼 180ms；减少动态偏好时不眨
+  blinkTimer = setTimeout(() => {
+    if (blinkReady.value) {
+      blinking.value = true
+      setTimeout(() => { blinking.value = false }, 180)
+    }
+    scheduleBlink()
+  }, 2800 + Math.random() * 2400)
+}
+
 // 人员钉钉号映射：{ 姓名: 钉钉号 }，配置后点击姓名可唤起钉钉单聊
 const staffMap = computed(() => {
   const map = {}
@@ -324,10 +341,17 @@ onMounted(async () => {
     online.value = pingData.configured === true
     const data = await config.json()
     if (data.success) sidebar.value = data.config || sidebar.value
+    // 眨眼：预加载闭眼帧（存在才启用），成功后开始定时眨眼
+    if (launcherIsImage.value && blinkImage.value && !reduceMotion) {
+      const pre = new Image()
+      pre.onload = () => { blinkReady.value = true; scheduleBlink() }
+      pre.src = blinkImage.value
+    }
   } catch { online.value = false }
 })
 onUnmounted(() => {
   clearInterval(clockTimer)
+  clearTimeout(blinkTimer)
   if (imageClickListener) document.removeEventListener('click', imageClickListener)
   if (expandListener) window.removeEventListener('message', expandListener)
 })
@@ -336,7 +360,7 @@ onUnmounted(() => {
 <template>
   <div class="widget-root" :class="{ embedded, maximized, full }">
     <button v-if="!open" ref="launcherEl" class="launcher" :class="{ dragging: launcherDragging }" :style="launcherStyle" type="button" aria-label="打开智能助理" @pointerdown="onLauncherDown" @pointermove="onLauncherMove" @pointerup="onLauncherUp" @pointercancel="onLauncherUp" @lostpointercapture="onLauncherUp" @click="onLauncherClick">
-      <span class="launcher-mark"><img v-if="launcherIsImage" :src="launcherImage" alt="" draggable="false"><template v-else>{{ launcherText }}</template></span>
+      <span class="launcher-mark"><img v-if="launcherIsImage" :src="launcherSrc" alt="" draggable="false"><template v-else>{{ launcherText }}</template></span>
       <span class="launcher-pulse" />
     </button>
 
