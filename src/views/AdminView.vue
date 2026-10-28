@@ -32,11 +32,21 @@ const current = computed(() => sections.find(item => item[0] === active.value))
 const embedQuery = computed(() => settings.embedToken ? `?token=${encodeURIComponent(settings.embedToken)}` : '')
 const embedCode = computed(() => `<script src="${location.origin}/embed.js${embedQuery.value}" data-position="right" data-bottom="24" data-side="24"><\/script>`)
 const embedFull = computed(() => `<iframe src="${location.origin}/?mode=full" style="width:100%;height:100%;min-height:560px;border:0" allow="microphone"></iframe>`)
-const avatarIsImage = computed(() => /^(https?:|data:image|\/uploads\/)/i.test(sidebar.brand.avatar.trim()))
+const avatarIsImage = computed(() => /^(https?:|data:image|\/(?:uploads|presets)\/)/i.test(sidebar.brand.avatar.trim()))
 const avatarText = computed(() => sidebar.brand.avatar.trim() || 'AI')
-const launcherIsImage = computed(() => /^(https?:|data:image|\/uploads\/)/i.test(sidebar.brand.launcher.trim()))
+const launcherIsImage = computed(() => /^(https?:|data:image|\/(?:uploads|presets)\/)/i.test(sidebar.brand.launcher.trim()))
 const launcherText = computed(() => sidebar.brand.launcher.trim() || avatarText.value)
 const brandName = computed(() => sidebar.brand.name.trim() || '小冷')
+
+// 预设形象：点选填充头像与悬浮按钮图（-half/-blink 眨眼帧按同名约定自动配套），保存后生效
+const brandPresets = [
+  { id: 'teal', name: '冷链青', launcher: '/presets/teal.png', avatar: '/presets/teal.png' },
+  { id: 'blue', name: '经典蓝', launcher: '/presets/blue.png', avatar: '/presets/blue.png' },
+]
+function applyPreset(p) {
+  sidebar.brand.launcher = p.launcher
+  sidebar.brand.avatar = p.avatar
+}
 
 function notice(message) {
   toast.value = message
@@ -215,6 +225,15 @@ onMounted(async () => {
 
         <section v-if="active === 'brand'" class="card">
           <div class="card-head"><div><h2>机器人形象</h2><p>自定义聊天窗口中机器人的名称、头像与悬浮按钮图片。留空时使用默认值（小冷 / AI）；悬浮按钮图片留空时沿用机器人头像。嵌入方若显式设置了 <code>data-title</code>，仍以嵌入方为准。</p></div><span class="status-badge success">实时预览</span></div>
+          <div class="preset-section">
+            <span class="preset-label">预设形象（点选填充，再点下方「保存形象设置」生效；也可继续自定义上传）</span>
+            <div class="preset-list">
+              <button v-for="p in brandPresets" :key="p.id" type="button" class="preset-card" :class="{ active: sidebar.brand.launcher === p.launcher }" @click="applyPreset(p)">
+                <img :src="p.launcher" :alt="p.name">
+                <span>{{ p.name }}</span>
+              </button>
+            </div>
+          </div>
           <div class="form-grid">
             <label><span>机器人名称</span><input v-model="sidebar.brand.name" placeholder="例如：小冷" maxlength="30"></label>
             <div class="image-field">

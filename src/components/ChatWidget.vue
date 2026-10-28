@@ -62,11 +62,11 @@ function closeDownload() {
 // 机器人形象：名称与头像（头像为图片 URL 时渲染图片，否则渲染文字/表情）
 const title = computed(() => urlTitle || sidebar.value.brand?.name || '小冷')
 const avatar = computed(() => String(sidebar.value.brand?.avatar || '').trim())
-const avatarIsImage = computed(() => /^(https?:|data:image|\/uploads\/)/i.test(avatar.value))
+const avatarIsImage = computed(() => /^(https?:|data:image|\/(?:uploads|presets)\/)/i.test(avatar.value))
 const avatarText = computed(() => avatar.value || 'AI')
 // 悬浮按钮图：单独配置时优先，否则沿用头像
 const launcher = computed(() => String(sidebar.value.brand?.launcher || '').trim())
-const launcherIsImage = computed(() => /^(https?:|data:image|\/uploads\/)/i.test(launcher.value) || (!launcher.value && avatarIsImage.value))
+const launcherIsImage = computed(() => /^(https?:|data:image|\/(?:uploads|presets)\/)/i.test(launcher.value) || (!launcher.value && avatarIsImage.value))
 const launcherImage = computed(() => launcher.value || avatar.value)
 const launcherText = computed(() => launcher.value || avatarText.value)
 
