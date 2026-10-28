@@ -382,7 +382,6 @@ onUnmounted(() => {
   <div class="widget-root" :class="{ embedded, maximized, full }">
     <button v-if="!open" ref="launcherEl" class="launcher" :class="{ dragging: launcherDragging }" :style="launcherStyle" type="button" aria-label="打开智能助理" @pointerdown="onLauncherDown" @pointermove="onLauncherMove" @pointerup="onLauncherUp" @pointercancel="onLauncherUp" @lostpointercapture="onLauncherUp" @click="onLauncherClick">
       <span class="launcher-mark"><img v-if="launcherIsImage" :src="launcherSrc" alt="" draggable="false"><template v-else>{{ launcherText }}</template></span>
-      <span class="launcher-pulse" />
     </button>
 
     <section v-else class="chat-window" :class="{ maximized }" aria-label="智能助理对话窗口">
