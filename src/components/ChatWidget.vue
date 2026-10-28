@@ -198,6 +198,18 @@ function onLauncherClick() {
   if (launcherClickSuppressed) { launcherClickSuppressed = false; return }
   openChat()
 }
+// 隐藏悬浮球：仅当前页面生效（不持久化），刷新后重新出现；消失带收缩淡出动画
+const launcherHidden = ref(false)
+const launcherHiding = ref(false)
+function hideLauncher() {
+  if (launcherHiding.value || launcherHidden.value) return
+  launcherHiding.value = true
+  launcherDrag = null // 取消进行中的拖动
+  setTimeout(() => {
+    launcherHidden.value = true
+    if (embedded) window.parent.postMessage({ source: 'zto-ai-widget', type: 'hide' }, parentOrigin)
+  }, 220)
+}
 function restoreLauncherPos(attempt = 0) {
   // 嵌入模式：悬浮球位置由外层 embed.js 记忆与移动，iframe 内保持默认右下角
   if (embedded) return
@@ -380,8 +392,11 @@ onUnmounted(() => {
 
 <template>
   <div class="widget-root" :class="{ embedded, maximized, full }">
-    <button v-if="!open" ref="launcherEl" class="launcher" :class="{ dragging: launcherDragging }" :style="launcherStyle" type="button" aria-label="打开智能助理" @pointerdown="onLauncherDown" @pointermove="onLauncherMove" @pointerup="onLauncherUp" @pointercancel="onLauncherUp" @lostpointercapture="onLauncherUp" @click="onLauncherClick">
+    <button v-if="!open && !launcherHidden" ref="launcherEl" class="launcher" :class="{ dragging: launcherDragging, hiding: launcherHiding }" :style="launcherStyle" type="button" aria-label="打开智能助理" @pointerdown="onLauncherDown" @pointermove="onLauncherMove" @pointerup="onLauncherUp" @pointercancel="onLauncherUp" @lostpointercapture="onLauncherUp" @click="onLauncherClick">
       <span class="launcher-mark"><img v-if="launcherIsImage" :src="launcherSrc" alt="" draggable="false"><template v-else>{{ launcherText }}</template></span>
+      <span class="launcher-dismiss" role="button" tabindex="0" aria-label="隐藏悬浮球" title="隐藏" @click.stop="hideLauncher" @pointerdown.stop @pointermove.stop @pointerup.stop @keydown.enter.stop.prevent="hideLauncher" @keydown.space.stop.prevent="hideLauncher">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+      </span>
     </button>
 
     <section v-else class="chat-window" :class="{ maximized }" aria-label="智能助理对话窗口">

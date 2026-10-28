@@ -92,6 +92,11 @@
     const m = event.data
     if (!m || m.source !== 'zto-ai-widget') return
 
+    // 用户点了隐藏：整个 iframe 移除显示（不持久化，刷新页面 embed.js 重新创建即恢复）
+    if (m.type === 'hide') {
+      frame.style.display = 'none'
+      return
+    }
     // 按下球：展开全屏透明层，让球在 iframe 内部原生拖动（无跨文档逐帧转发，零延迟零漂移）
     if (m.type === 'prepare') {
       // 展开前记录球当前位置（= iframe 当前位置 + 内边距），展开后球原位重锚
