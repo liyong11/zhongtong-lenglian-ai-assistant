@@ -48,9 +48,9 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 .launcher.dragging:hover,.launcher.dragging:active{transform:none}
 .embedded .launcher{right:8px;bottom:8px}
 .launcher-mark{position:absolute;inset:0;display:grid;place-items:center;border:0;background:transparent;font-size:22px;font-weight:800;letter-spacing:.04em;pointer-events:none}
-.launcher-mark img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none;-webkit-user-drag:none;user-select:none;transition:transform .22s var(--ease)}
-.launcher:hover .launcher-mark img{transform:scale(1.08) rotate(-4deg)}
-.launcher.dragging .launcher-mark img{transform:scale(1.05) rotate(5deg);transition:none}
+.launcher-mark img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none;-webkit-user-drag:none;user-select:none;transform:scale(.8);transition:transform .22s var(--ease)}
+.launcher:hover .launcher-mark img{transform:scale(.86) rotate(-4deg)}
+.launcher.dragging .launcher-mark img{transform:scale(.84) rotate(5deg);transition:none}
 
 .chat-window{position:fixed;right:24px;bottom:24px;width:min(760px,calc(100vw - 48px));height:min(620px,calc(100vh - 48px));overflow:hidden;border:1px solid rgba(15,31,45,.08);border-radius:var(--radius-xl);background:#fff;box-shadow:var(--shadow-l);pointer-events:auto;display:flex;flex-direction:column;animation:window-in .28s var(--ease)}
 @keyframes window-in{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
@@ -421,6 +421,6 @@ code{padding:2px 5px;border-radius:5px;background:#f1f5f9;color:var(--primary-de
   .launcher{transition:none;animation:none}
   .launcher-dismiss{transition:none}
   .launcher-mark img{transition:none}
-  .launcher:hover .launcher-mark img,.launcher.dragging .launcher-mark img{transform:none}
+  .launcher:hover .launcher-mark img,.launcher.dragging .launcher-mark img{transform:scale(.8)}
   .launcher:hover,.launcher:active,.button.primary:hover:not(:disabled),.composer-footer button:hover:not(:disabled){transform:none}
 }
