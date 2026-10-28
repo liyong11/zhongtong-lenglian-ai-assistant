@@ -139,7 +139,7 @@ const launcherMarkEl = ref(null)
 const launcherHover = ref(false)
 let launcherAnim = null
 const canLauncherAnim = computed(() =>
-  launcherIsImage.value && !reduceMotion && !open.value && !launcherHidden.value && !launcherHiding.value && !launcherDragging.value && !launcherHover.value
+  launcherIsImage.value && !reduceMotion && !open.value && !launcherHidden.value && !launcherHiding.value && !launcherDragging.value
 )
 const launcherPos = ref(null) // { left, bottom }；null 时走 CSS 默认位置
 const launcherDragging = ref(false)
@@ -414,7 +414,7 @@ onUnmounted(() => {
 
 <template>
   <div class="widget-root" :class="{ embedded, maximized, full }">
-    <button v-if="!open && !launcherHidden" ref="launcherEl" class="launcher" :class="{ dragging: launcherDragging, hiding: launcherHiding }" :style="launcherStyle" type="button" aria-label="打开智能助理" @pointerdown="onLauncherDown" @pointermove="onLauncherMove" @pointerup="onLauncherUp" @pointercancel="onLauncherUp" @lostpointercapture="onLauncherUp" @click="onLauncherClick" @mouseenter="launcherHover = true" @mouseleave="launcherHover = false">
+    <button v-if="!open && !launcherHidden" ref="launcherEl" class="launcher" :class="{ dragging: launcherDragging, hiding: launcherHiding }" :style="launcherStyle" type="button" aria-label="打开智能助理" @pointerdown="onLauncherDown" @pointermove="onLauncherMove" @pointerup="onLauncherUp" @pointercancel="onLauncherUp" @lostpointercapture="onLauncherUp" @click="onLauncherClick" @mouseenter="launcherHover = true; launcherAnim && launcherAnim.setHover(true)" @mouseleave="launcherHover = false; launcherAnim && launcherAnim.setHover(false)">
       <span ref="launcherMarkEl" class="launcher-mark"><img v-if="launcherIsImage" :src="launcherSrc" alt="" draggable="false"><template v-else>{{ launcherText }}</template></span>
       <span class="launcher-dismiss" role="button" tabindex="0" aria-label="隐藏悬浮球" title="隐藏" @click.stop="hideLauncher" @pointerdown.stop @pointermove.stop @pointerup.stop @keydown.enter.stop.prevent="hideLauncher" @keydown.space.stop.prevent="hideLauncher">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
