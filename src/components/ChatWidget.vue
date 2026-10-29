@@ -158,6 +158,7 @@ function clampLauncher(left, bottom) {
 }
 function onLauncherDown(event) {
   if (launcherDrag || (event.pointerType === 'mouse' && event.button !== 0)) return
+  if (launcherAnim) launcherAnim.cancel() // 拖动/打开前停止待机动画，避免与外层状态机冲突
   launcherClickSuppressed = false // 新手势开始：清除上次拖动遗留的点击抑制，避免吞掉正常点击
   const rect = launcherEl.value.getBoundingClientRect()
   launcherDrag = {
@@ -235,6 +236,7 @@ function restoreLauncherPos(attempt = 0) {
   } catch { /* 无记忆或隐私模式：走默认右下角 */ }
 }
 function openChat() {
+  if (launcherAnim) launcherAnim.cancel() // 打开前停止待机动画，避免动画扩框覆盖聊天窗
   open.value = true
   if (!messages.value.length) messages.value.push(makeWelcome())
   notify(maximized.value ? 'maximized' : 'open')

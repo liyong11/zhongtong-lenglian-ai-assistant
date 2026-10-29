@@ -328,6 +328,20 @@ export function createLauncherAnim(options) {
   return {
     start() { const m = mark(); if (m) m.classList.add('bob'); schedule() },
     setHover,
+    // 打开聊天窗/拖动球前调用：停止当前动作与扩框、清理粒子，避免与打开/拖动的外层状态机冲突
+    cancel() {
+      clearTimeout(timer)
+      previewMode = false
+      hoverActive = false
+      acting = false
+      const m = mark()
+      if (m) { m.getAnimations().forEach(a => a.cancel()); m.classList.remove('acting') }
+      particles.forEach(p => p.remove())
+      particles.clear()
+      if (setBlink) setBlink('')
+      if (embedded) collapse()
+      schedule()
+    },
     stop() {
       clearTimeout(timer)
       const m = mark()

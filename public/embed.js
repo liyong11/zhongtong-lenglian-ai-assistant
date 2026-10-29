@@ -140,6 +140,7 @@
     }
     // 大动作（跳水/喷水）：临时扩框给动作空间，保持球屏幕位置不动，动作完缩回
     if (m.type === 'anim-expand') {
+      if (state === 'open' || state === 'maximized') return // 聊天窗打开时不做动画扩框
       const rect = frame.getBoundingClientRect()
       const ballLeft = rect.left + INSET, ballTop = rect.top + INSET
       const w = m.w, h = m.h
@@ -151,8 +152,7 @@
       return
     }
     if (m.type === 'anim-collapse') {
-      state = 'collapsed'
-      applyCollapsed()
+      if (state === 'anim') { state = 'collapsed'; applyCollapsed() } // 仅动画状态才缩回，避免覆盖打开/拖动
       return
     }
     // 按下球：展开全屏透明层，让球在 iframe 内部原生拖动（无跨文档逐帧转发，零延迟零漂移）
