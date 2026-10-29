@@ -59,7 +59,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 .launcher:hover .launcher-mark img{transform:scale(.86) rotate(-4deg)}
 .launcher.dragging .launcher-mark img{transform:scale(.84) rotate(5deg);transition:none}
 
-.chat-window{position:fixed;right:24px;bottom:24px;width:min(760px,calc(100vw - 48px));height:min(620px,calc(100vh - 48px));overflow:hidden;border:1px solid rgba(15,31,45,.08);border-radius:var(--radius-xl);background:#fff;box-shadow:var(--shadow-l);pointer-events:auto;display:flex;flex-direction:column;animation:window-in .28s var(--ease)}
+.chat-window{position:fixed;right:24px;bottom:24px;width:min(760px,calc(100vw - 48px));height:min(620px,calc(100vh - 48px));overflow:hidden;border:1px solid rgba(15,31,45,.08);border-radius:var(--radius-xl);background:#fff;box-shadow:var(--shadow-l);pointer-events:auto;display:flex;flex-direction:column;animation:window-in .28s var(--ease);container-type:inline-size}
 @keyframes window-in{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
 .embedded .chat-window{inset:0;width:100%;height:100%;border-radius:18px}
 .full .chat-window{inset:0;width:100%;height:100%;border:none;border-radius:0;box-shadow:none;animation:none}
@@ -402,7 +402,7 @@ a.staff-ding:hover{background:#d0f1ee;color:#08655f}
 
 code{padding:2px 5px;border-radius:5px;background:#f1f5f9;color:var(--primary-deep);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.92em}
 
-@media(max-width:760px){
+@container (max-width:560px){
   .chat-layout{grid-template-columns:1fr}
   .chat-aside{display:none}
   .header-duty{display:none}
@@ -410,6 +410,9 @@ code{padding:2px 5px;border-radius:5px;background:#f1f5f9;color:var(--primary-de
   .chat-window{right:10px;bottom:10px;width:calc(100vw - 20px);height:calc(100vh - 20px)}
   .composer{margin:10px}
   .message-list{padding:16px}
+}
+
+@media(max-width:760px){
   .admin-shell{grid-template-columns:76px minmax(0,1fr)}
   .admin-brand{justify-content:center;padding-inline:0}
   .admin-brand>div,.admin-sidebar nav button span,.admin-sidebar-footer{display:none}
