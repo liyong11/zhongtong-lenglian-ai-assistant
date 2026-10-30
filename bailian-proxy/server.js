@@ -58,11 +58,11 @@ function loadJson(filePath, label) {
     return {};
   }
 }
-function writeJsonAtomic(filePath, obj) {
-  const tmp = filePath + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify(obj, null, 2), 'utf-8');
-  fs.renameSync(tmp, filePath);
-}
+const JSON_WRITE_FILES = {
+  sidebar: path.join(__dirname, 'sidebar.json'),
+  sessions: path.join(__dirname, 'sessions.json'),
+  config: path.join(__dirname, 'config.json'),
+};
 
 // 侧边栏配置（值班表 / 下载汇总 / 常见问题 / 人员 / 机器人形象）—— 配置中台读写
 function loadSidebar() {
@@ -156,7 +156,7 @@ function loadSessions() {
   return sessions;
 }
 function saveSessions() {
-  try { writeJsonAtomic(SESSIONS_PATH, sessions || {}); }
+  try { fs.writeFileSync(path.join(__dirname, 'sessions.json.tmp'), JSON.stringify(sessions || {}, null, 2), 'utf-8'); fs.renameSync(path.join(__dirname, 'sessions.json.tmp'), path.join(__dirname, 'sessions.json'));; }
   catch (e) { console.error('[auth] 会话落盘失败:', e.message || e); }
 }
 function parseCookies(req) {
@@ -227,7 +227,7 @@ function recordStaffUserId(user) {
   if (!hit) return;
   hit.userId = user.id;
   try {
-    writeJsonAtomic(SIDEBAR_PATH, sb);
+    fs.writeFileSync(path.join(__dirname, 'sidebar.json.tmp'), JSON.stringify(sb, null, 2), 'utf-8'); fs.renameSync(path.join(__dirname, 'sidebar.json.tmp'), path.join(__dirname, 'sidebar.json'));;
     console.log('[auth] 已自动记录管理员「' + hit.name + '」的钉钉 userId=' + user.id);
   } catch (e) {
     console.error('[auth] 记录 userId 失败:', e.message || e);
@@ -553,6 +553,8 @@ function mapErr(status, data) {
 const RATE_WINDOW_MS = 60 * 1000;
 const RATE_LIMIT = Number(process.env.CHAT_RATE_LIMIT || 30);
 const rateBuckets = new Map(); // ip -> 最近请求时间戳
+const MAX_CONCURRENT_STREAMS = 15; // 全局 SSE 并发上限，防止高并发撑爆小内存服务器
+let activeStreams = 0;
 function tooManyRequests(req) {
   if (!(RATE_LIMIT > 0)) return false;
   const ip = (req.socket && req.socket.remoteAddress) || 'unknown';
@@ -769,7 +771,7 @@ const server = http.createServer(async (req, res) => {
     if (apiKey) cfg.apiKey = apiKey;
     if (body.clearApiKey === true) cfg.apiKey = '';
     try {
-      writeJsonAtomic(CFG_PATH, cfg);
+      fs.writeFileSync(path.join(__dirname, 'config.json.tmp'), JSON.stringify(cfg, null, 2), 'utf-8'); fs.renameSync(path.join(__dirname, 'config.json.tmp'), path.join(__dirname, 'config.json'));;
       send(res, 200, { success: true, settings: publicSettings(cfg) });
     } catch (e) {
       send(res, 500, { success: false, error: '保存失败: ' + (e.message || e) });
@@ -816,7 +818,7 @@ const server = http.createServer(async (req, res) => {
     const brand = (sb.brand && typeof sb.brand === 'object') ? sb.brand : {};
     sb.brand = { name: cleanText(brand.name, 30), avatar: cleanText(brand.avatar, 500), launcher: cleanText(brand.launcher, 500) };
     try {
-      writeJsonAtomic(SIDEBAR_PATH, sb);
+      fs.writeFileSync(path.join(__dirname, 'sidebar.json.tmp'), JSON.stringify(sb, null, 2), 'utf-8'); fs.renameSync(path.join(__dirname, 'sidebar.json.tmp'), path.join(__dirname, 'sidebar.json'));;
       send(res, 200, { success: true, config: sb, today: todayDuty(sb) });
     } catch (e) {
       send(res, 500, { success: false, error: '保存失败: ' + (e.message || e) });
@@ -868,6 +870,15 @@ const server = http.createServer(async (req, res) => {
   // 对话流式接口：智能体应用与模型直调两种模式均支持
   if (req.method === 'POST' && req.url.split('?')[0] === '/api/chat/stream') {
     if (tooManyRequests(req)) { send(res, 429, { success: false, error: '请求过于频繁，请稍后再试' }); return; }
+    // 全局并发上限：超过直接 429，避免高并发把服务器内存/CPU 拖垮
+    if (activeStreams >= MAX_CONCURRENT_STREAMS) { send(res, 429, { success: false, error: '当前咨询人数较多，请稍等几秒再试' }); return; }
+    activeStreams++;
+    // 单条流最长 120s，防止长连接堆积
+    const streamTimeout = setTimeout(() => { try { res.end(); } catch (e) { /* 忽略 */ } }, 120000);
+    let released = false;
+    const releaseStream = () => { if (released) return; released = true; activeStreams = Math.max(0, activeStreams - 1); clearTimeout(streamTimeout); };
+    res.on('close', releaseStream);
+    res.on('finish', releaseStream);
     const cfg = loadConfig();
     let body;
     try { body = await readBody(req); }
@@ -886,11 +897,13 @@ const server = http.createServer(async (req, res) => {
     try {
       if (!cfg.apiKey) throw new Error('未配置 API Key，请在管理后台或 bailian-proxy/config.json 中填写 apiKey');
       if (mode === 'app') {
-        await callAppStream(cfg, prompt, body.session_id || null, res);
+        await callAppStream(cfg, String(prompt).slice(0, 4000), body.session_id || null, res);
       } else if (mode === 'model') {
-        const messages = (Array.isArray(body.messages) && body.messages.length)
+        const messages = ((Array.isArray(body.messages) && body.messages.length)
           ? body.messages
-          : [{ role: 'user', content: prompt }];
+          : [{ role: 'user', content: prompt }])
+          .slice(-20)
+          .map(m => ({ role: m.role, content: String(m.content || '').slice(0, 2000) }));
         await callModelStream(cfg, messages, res);
       } else {
         throw new Error('config.json 中 appId 与 model 均未配置，请在管理后台选择接入模式');
