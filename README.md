@@ -68,6 +68,7 @@ https://你的域名/api/auth/dingtalk/callback
 | `PORT` | `8787` | 服务端口 |
 | `ADMIN_TOKEN` | 空 | 管理后台令牌；生产/内网共享环境务必设置 |
 | `CHAT_RATE_LIMIT` | `30` | 对话接口每 IP 每分钟请求上限，`0` 关闭 |
+| `SSE_MAX_CONCURRENT` | `50` | 全局 SSE 流并发上限，超出返回 429「咨询人数较多」；2核4G 机器可调到 50~100 |
 
 ## 安全说明
 

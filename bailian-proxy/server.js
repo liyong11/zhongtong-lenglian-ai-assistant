@@ -553,7 +553,7 @@ function mapErr(status, data) {
 const RATE_WINDOW_MS = 60 * 1000;
 const RATE_LIMIT = Number(process.env.CHAT_RATE_LIMIT || 30);
 const rateBuckets = new Map(); // ip -> 最近请求时间戳
-const MAX_CONCURRENT_STREAMS = 15; // 全局 SSE 并发上限，防止高并发撑爆小内存服务器
+const MAX_CONCURRENT_STREAMS = Math.max(1, Number(process.env.SSE_MAX_CONCURRENT || 50)); // 全局 SSE 并发上限（SSE_MAX_CONCURRENT 可按服务器规格调整），防止高并发撑爆小内存服务器
 let activeStreams = 0;
 function tooManyRequests(req) {
   if (!(RATE_LIMIT > 0)) return false;
@@ -693,7 +693,8 @@ const server = http.createServer(async (req, res) => {
       const cfg = loadConfig();
       const d = dingtalkCfg(cfg);
       if (!dingtalkReady(cfg)) { fail('服务端未配置钉钉登录'); return; }
-      const user = await dingtalk.getUserByCode(q.get('code') || '', d.appKey, d.appSecret);
+      const code = String(q.get('code') || '').slice(0, 256); // 授权码长度收口：异常超长输入直接按无效处理
+      const user = await dingtalk.getUserByCode(code, d.appKey, d.appSecret);
       if (!inAdminWhitelist(cfg, user)) {
         console.log('[auth] 非白名单登录被拒: ' + user.name + ' (' + user.userId + ')');
         fail('该账号不在管理白名单内');
@@ -718,9 +719,10 @@ const server = http.createServer(async (req, res) => {
     try { body = await readBody(req); }
     catch (e) { send(res, 400, { success: false, error: e.message }); return; }
     if (!body.authCode) { send(res, 400, { success: false, error: '缺少 authCode' }); return; }
+    const authCode = String(body.authCode).slice(0, 256); // 授权码长度收口
     try {
       const d = dingtalkCfg(cfg);
-      const user = await dingtalk.getUserByAuthCode(body.authCode, d.appKey, d.appSecret);
+      const user = await dingtalk.getUserByAuthCode(authCode, d.appKey, d.appSecret);
       if (!inAdminWhitelist(cfg, user)) {
         console.log('[auth] 非白名单免登被拒: ' + user.name + ' (' + user.userId + ')');
         send(res, 403, { success: false, error: '该账号不在管理白名单内' });
