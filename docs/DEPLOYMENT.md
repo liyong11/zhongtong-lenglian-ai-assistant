@@ -33,6 +33,9 @@ pnpm test && pnpm build
 
 # 2. 白名单同步（直连失败就加 -e 'ssh -J root@42.192.205.206'）
 #    后端代码：绝不带 config.json / sessions.json / uploads / *.log（线上运行时数据）
+#    ⚠️ 先回拉 sidebar.json！它是管理后台可改的运行时数据但又被 git 跟踪：
+scp root@121.199.175.111:/opt/aitalk/bailian-proxy/sidebar.json bailian-proxy/sidebar.json
+#    后台改过侧边栏就提交这次回拉，否则下一步 rsync 会把后台的修改覆盖回旧版
 rsync -az --partial \
   bailian-proxy/server.js bailian-proxy/dingtalk.js bailian-proxy/sidebar.json \
   bailian-proxy/config.example.json \
