@@ -1,8 +1,8 @@
 {
   "brand": {
     "name": "鲸小宝PLUS",
-    "avatar": "",
-    "launcher": ""
+    "avatar": "/presets/whale-flip.png",
+    "launcher": "/presets/whale-flip.png"
   },
   "onDuty": {
     "byDate": {
@@ -88,15 +88,27 @@
   "downloads": [
     {
       "name": "PDA下载",
-      "url": "https://example.com/download/pda-app.apk"
+      "url": "https://example.com/download/pda-app.apk",
+      "methods": [
+        "qr",
+        "direct"
+      ]
     },
     {
       "name": "鲸小宝(安卓)",
-      "url": "https://example.com/download/jingxiaobao-android.apk"
+      "url": "https://example.com/download/jingxiaobao-android.apk",
+      "methods": [
+        "qr",
+        "direct"
+      ]
     },
     {
       "name": "鲸小宝(苹果)",
-      "url": "https://example.com/download/jingxiaobao-ios.mobileconfig"
+      "url": "https://example.com/download/jingxiaobao-ios.mobileconfig",
+      "methods": [
+        "qr",
+        "direct"
+      ]
     }
   ],
   "faq": [
@@ -144,7 +156,7 @@
       "name": "侯鹏",
       "dingtalkId": "17721889126",
       "isAdmin": true,
-      "userId": ""
+      "userId": "0bkJZxB1iPT4vbE5nhQSiSiiQiEiE"
     }
   ]
 }
