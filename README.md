@@ -24,6 +24,144 @@ pnpm start          # 启动代理，默认端口 8787（PORT 环境变量可覆
 
 开发模式：`pnpm dev`（Vite 5173，`/api` 自动代理到 8787，需同时跑 `pnpm dev:server`）。
 
+## 部署（Linux 服务器）
+
+线上：<https://aitalk.beta.ztocc.com>（`*.beta.ztocc.com` 通配符证书，DNS 无需单独解析）。
+
+| 项 | 值 |
+| --- | --- |
+| 服务器 | 公司 A `root@121.199.175.111`；个人 B（跳板）`root@42.192.205.206` |
+| 连接 | 先直连 A，超时再走 B：`ssh -J root@42.192.205.206 root@121.199.175.111` |
+| 应用目录 | `/opt/aitalk`（`dist/` + `bailian-proxy/`） |
+| 进程 | pm2 名称 `aitalk`；Node v24（nvm：`/root/.nvm/versions/node/v24.11.0/bin`） |
+| 端口 | 应用监听 `8787`，仅供 nginx 本机反代；安全组**不要**放行 8787 |
+| nginx | `/www/server/panel/vhost/nginx/aitalk.beta.ztocc.com.conf`（宝塔目录） |
+| 证书 | `/www/server/panel/vhost/letsencrypt/beta.ztocc.com/`（acme 自动续期，新子域名直接复用） |
+
+后端只用 Node 内置模块，**服务器上不需要 `pnpm install` 或 `node_modules`**；换服务器时把 IP、域名、证书路径换掉，其余步骤相同。
+
+### 首次部署
+
+```bash
+# 1. 本地准备（Node ≥ 20、pnpm）并构建
+git clone https://github.com/liyong11/zhongtong-lenglian-ai-assistant.git
+cd zhongtong-lenglian-ai-assistant
+pnpm install
+pnpm test && pnpm build          # 产物在 dist/
+
+# 2. 建目录 + 白名单上传（绝不整仓上传）
+ssh root@121.199.175.111 'mkdir -p /opt/aitalk/bailian-proxy'
+rsync -az --partial \
+  bailian-proxy/server.js bailian-proxy/dingtalk.js bailian-proxy/config.example.json \
+  root@121.199.175.111:/opt/aitalk/bailian-proxy/
+rsync -az --partial --exclude .DS_Store dist/ \
+  root@121.199.175.111:/opt/aitalk/dist/
+
+# 3. 首次配置（只填一次，之后全部走 /admin）
+ssh root@121.199.175.111 '
+  cd /opt/aitalk/bailian-proxy &&
+  cp config.example.json config.json && chmod 600 config.json && vi config.json'
+  # apiKey 必填；appId 与 model 二选一
+
+# 4. 启动 + 开机自启
+ssh root@121.199.175.111 '
+  export PATH=/root/.nvm/versions/node/v24.11.0/bin:$PATH
+  cd /opt/aitalk
+  pm2 start bailian-proxy/server.js --name aitalk
+  pm2 startup       # 若提示未配置，按输出的命令执行一次
+  pm2 save'
+```
+
+nginx vhost（与线上一致，SSE 相关项不能删）：
+
+```nginx
+server {
+    listen 80;
+    server_name aitalk.beta.ztocc.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name aitalk.beta.ztocc.com;
+
+    ssl_certificate /www/server/panel/vhost/letsencrypt/beta.ztocc.com/fullchain.pem;
+    ssl_certificate_key /www/server/panel/vhost/letsencrypt/beta.ztocc.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    client_max_body_size 10m;
+
+    # SSE 流式对话：关缓冲、拉长读超时
+    location = /api/chat/stream {
+        proxy_pass http://127.0.0.1:8787;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header Connection "";
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 300s;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:8787;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_read_timeout 120s;
+    }
+}
+```
+
+放到宝塔 vhost 目录后 `nginx -t && nginx -s reload`（宝塔安装的 nginx，vhost 不在 `/etc/nginx`）。
+
+```bash
+# 5. 验证
+curl -fsS https://aitalk.beta.ztocc.com/api/ping      # {"success":true,...}
+curl -fsSI https://aitalk.beta.ztocc.com/embed.js | head -1
+```
+
+配置了钉钉登录时，还要在钉钉开放平台补两处：授权回调地址 `https://aitalk.beta.ztocc.com/api/auth/dingtalk/callback`；安全设置 → 服务器出口 IP 加入 A 的公网出口 IP，否则报 `60020 访问ip不在白名单之中`。
+
+### 日常发布（改代码后）
+
+```bash
+pnpm test && pnpm build
+
+# sidebar.json 是后台可改的运行时数据却又被 git 跟踪：先回拉，避免把线上修改覆盖回旧版
+scp root@121.199.175.111:/opt/aitalk/bailian-proxy/sidebar.json bailian-proxy/sidebar.json
+
+rsync -az --partial \
+  bailian-proxy/server.js bailian-proxy/dingtalk.js bailian-proxy/sidebar.json \
+  bailian-proxy/config.example.json \
+  root@121.199.175.111:/opt/aitalk/bailian-proxy/
+rsync -az --partial --exclude .DS_Store dist/ \
+  root@121.199.175.111:/opt/aitalk/dist/
+
+ssh root@121.199.175.111 'export PATH=/root/.nvm/versions/node/v24.11.0/bin:$PATH;
+  pm2 restart aitalk --update-env && pm2 save'
+curl -fsS https://aitalk.beta.ztocc.com/api/ping
+```
+
+直连超时就给 `ssh` / `scp` / `rsync` 加跳板：`ssh -J root@42.192.205.206 ...`、`rsync -e 'ssh -J root@42.192.205.206' ...`。
+
+### 部署红线
+
+- `bailian-proxy/config.json`（API Key、钉钉凭据、白名单）只存在于服务器，只能通过 `/admin` 修改，**不从本地覆盖、不进 git**。
+- `sidebar.json`、`sessions.json`、`uploads/`、`*.log` 是运行时数据，rsync 白名单天然避开；发布前先回拉 `sidebar.json`。
+- `dist/` 同步不要加 `--delete`：已打开的页面还在引用旧 hash chunk。
+- SSE `/api/chat/stream` 的 `proxy_buffering off`、`proxy_cache off`、`proxy_read_timeout 300s`、`X-Forwarded-Host` 缺一不可，否则逐字流式失效。
+- 改环境变量时用 `pm2 restart aitalk --update-env`，但要把所有变量显式重设一遍（`--update-env` 只增不改不清）：
+
+  ```bash
+  ssh root@121.199.175.111 'export PATH=/root/.nvm/versions/node/v24.11.0/bin:$PATH;
+    SSE_MAX_CONCURRENT=100 CHAT_RATE_LIMIT=30 pm2 restart aitalk --update-env && pm2 save'
+  ```
+
 ## 配置
 
 `bailian-proxy/config.json`（从 `config.example.json` 复制，**已被 .gitignore 忽略，严禁提交**）：
