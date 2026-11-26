@@ -1,0 +1,14 @@
+.git
+.gitignore
+node_modules
+dist
+docs
+data
+.env
+*.log
+bailian-proxy/config.json
+bailian-proxy/sidebar.json
+bailian-proxy/sessions.json
+bailian-proxy/uploads
+bailian-proxy/*.tmp
+bailian-proxy/*.corrupt-*

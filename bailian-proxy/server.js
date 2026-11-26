@@ -25,9 +25,11 @@ const dingtalk = require('./dingtalk');
 const DIST_ROOT = path.resolve(__dirname, '../dist');
 const PORT = process.env.PORT || 8787;
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
-const CFG_PATH = path.join(__dirname, 'config.json');
-const SIDEBAR_PATH = path.join(__dirname, 'sidebar.json');
-const UPLOAD_DIR = path.join(__dirname, 'uploads');
+const DATA_DIR = path.resolve(process.env.DATA_DIR || __dirname); // 运行时数据目录（Docker 里挂 /data）
+fs.mkdirSync(DATA_DIR, { recursive: true });
+const CFG_PATH = path.join(DATA_DIR, 'config.json');
+const SIDEBAR_PATH = path.join(DATA_DIR, 'sidebar.json');
+const UPLOAD_DIR = path.join(DATA_DIR, 'uploads');
 
 // 后台可上传的图片类型：扩展名即落盘扩展名（不收 svg，避免脚本注入）
 const UPLOAD_TYPES = {
@@ -37,7 +39,7 @@ const UPLOAD_TYPES = {
   'image/webp': '.webp'
 };
 const UPLOAD_NAME_RE = /^[a-z0-9-]+\.(png|jpg|gif|webp)$/;
-const SESSIONS_PATH = path.join(__dirname, 'sessions.json');
+const SESSIONS_PATH = path.join(DATA_DIR, 'sessions.json');
 const SESSION_COOKIE = 'zto_admin_sess';
 const SESSION_TTL = 7 * 24 * 60 * 60 * 1000;
 
@@ -59,9 +61,9 @@ function loadJson(filePath, label) {
   }
 }
 const JSON_WRITE_FILES = {
-  sidebar: path.join(__dirname, 'sidebar.json'),
-  sessions: path.join(__dirname, 'sessions.json'),
-  config: path.join(__dirname, 'config.json'),
+  sidebar: SIDEBAR_PATH,
+  sessions: SESSIONS_PATH,
+  config: CFG_PATH,
 };
 
 // 侧边栏配置（值班表 / 下载汇总 / 常见问题 / 人员 / 机器人形象）—— 配置中台读写
@@ -156,7 +158,7 @@ function loadSessions() {
   return sessions;
 }
 function saveSessions() {
-  try { fs.writeFileSync(path.join(__dirname, 'sessions.json.tmp'), JSON.stringify(sessions || {}, null, 2), 'utf-8'); fs.renameSync(path.join(__dirname, 'sessions.json.tmp'), path.join(__dirname, 'sessions.json'));; }
+  try { fs.writeFileSync(path.join(DATA_DIR, 'sessions.json.tmp'), JSON.stringify(sessions || {}, null, 2), 'utf-8'); fs.renameSync(path.join(DATA_DIR, 'sessions.json.tmp'), path.join(DATA_DIR, 'sessions.json'));; }
   catch (e) { console.error('[auth] 会话落盘失败:', e.message || e); }
 }
 function parseCookies(req) {
@@ -227,7 +229,7 @@ function recordStaffUserId(user) {
   if (!hit) return;
   hit.userId = user.id;
   try {
-    fs.writeFileSync(path.join(__dirname, 'sidebar.json.tmp'), JSON.stringify(sb, null, 2), 'utf-8'); fs.renameSync(path.join(__dirname, 'sidebar.json.tmp'), path.join(__dirname, 'sidebar.json'));;
+    fs.writeFileSync(path.join(DATA_DIR, 'sidebar.json.tmp'), JSON.stringify(sb, null, 2), 'utf-8'); fs.renameSync(path.join(DATA_DIR, 'sidebar.json.tmp'), path.join(DATA_DIR, 'sidebar.json'));;
     console.log('[auth] 已自动记录管理员「' + hit.name + '」的钉钉 userId=' + user.id);
   } catch (e) {
     console.error('[auth] 记录 userId 失败:', e.message || e);
@@ -773,7 +775,7 @@ const server = http.createServer(async (req, res) => {
     if (apiKey) cfg.apiKey = apiKey;
     if (body.clearApiKey === true) cfg.apiKey = '';
     try {
-      fs.writeFileSync(path.join(__dirname, 'config.json.tmp'), JSON.stringify(cfg, null, 2), 'utf-8'); fs.renameSync(path.join(__dirname, 'config.json.tmp'), path.join(__dirname, 'config.json'));;
+      fs.writeFileSync(path.join(DATA_DIR, 'config.json.tmp'), JSON.stringify(cfg, null, 2), 'utf-8'); fs.renameSync(path.join(DATA_DIR, 'config.json.tmp'), path.join(DATA_DIR, 'config.json'));;
       send(res, 200, { success: true, settings: publicSettings(cfg) });
     } catch (e) {
       send(res, 500, { success: false, error: '保存失败: ' + (e.message || e) });
@@ -820,7 +822,7 @@ const server = http.createServer(async (req, res) => {
     const brand = (sb.brand && typeof sb.brand === 'object') ? sb.brand : {};
     sb.brand = { name: cleanText(brand.name, 30), avatar: cleanText(brand.avatar, 500), launcher: cleanText(brand.launcher, 500) };
     try {
-      fs.writeFileSync(path.join(__dirname, 'sidebar.json.tmp'), JSON.stringify(sb, null, 2), 'utf-8'); fs.renameSync(path.join(__dirname, 'sidebar.json.tmp'), path.join(__dirname, 'sidebar.json'));;
+      fs.writeFileSync(path.join(DATA_DIR, 'sidebar.json.tmp'), JSON.stringify(sb, null, 2), 'utf-8'); fs.renameSync(path.join(DATA_DIR, 'sidebar.json.tmp'), path.join(DATA_DIR, 'sidebar.json'));;
       send(res, 200, { success: true, config: sb, today: todayDuty(sb) });
     } catch (e) {
       send(res, 500, { success: false, error: '保存失败: ' + (e.message || e) });

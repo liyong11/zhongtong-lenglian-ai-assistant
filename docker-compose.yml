@@ -1,0 +1,45 @@
+name: zto-ai-assistant
+
+services:
+  app:
+    build:
+      context: .
+      args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
+        NODE_IMAGE: ${NODE_IMAGE:-docker.m.daocloud.io/library/node:22-alpine}
+    image: zto-ai-assistant:latest
+    container_name: zto-ai-assistant
+    restart: unless-stopped
+    environment:
+      PORT: 8787
+      DATA_DIR: /data
+      PUBLIC_ORIGIN: https://${DOMAIN}
+      CHAT_RATE_LIMIT: ${CHAT_RATE_LIMIT:-30}
+      SSE_MAX_CONCURRENT: ${SSE_MAX_CONCURRENT:-100}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+    volumes:
+      - ./data:/data
+    expose:
+      - "8787"
+
+  caddy:
+    image: ${CADDY_IMAGE:-docker.m.daocloud.io/library/caddy:2-alpine}
+    container_name: zto-ai-caddy
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

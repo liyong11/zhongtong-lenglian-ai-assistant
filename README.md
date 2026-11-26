@@ -24,207 +24,276 @@ pnpm start          # 启动代理，默认端口 8787（PORT 环境变量可覆
 
 开发模式：`pnpm dev`（Vite 5173，`/api` 自动代理到 8787，需同时跑 `pnpm dev:server`）。
 
-## 部署（新服务器）
+## 部署（Docker，推荐）
 
-面向一台全新的 Linux 服务器（命令按 Ubuntu/Debian 写）。旧线上实例 `https://aitalk.beta.ztocc.com` 仅作参考，新环境把域名、IP、证书换成自己的即可。
-
-运行形态：一个 Node 进程（`bailian-proxy/server.js`，**零外部依赖**）监听 `8787`，托管 `dist/` 和 API；前面由 nginx 终结 HTTPS 并转发 SSE。
+整站两个容器：`app`（Node 代理 + 前端产物）和 `caddy`（自动申请 HTTPS、反代 SSE）。服务器**不需要装 Node、pnpm、nginx**，只要 Docker；代码在服务器上构建成镜像。
 
 ```
-/opt/ai-assistant/
-├── bailian-proxy/     # server.js、dingtalk.js、config.json、sidebar.json、uploads/
-└── dist/              # 前端构建产物（必须与 bailian-proxy 同级）
+公网 80/443 → caddy 容器 → app:8787 → /data（配置、会话、上传文件）
 ```
 
-### 1. 服务器准备
+### 0. 准备清单
+
+- 一台 Linux 服务器（Ubuntu 22.04/24.04，2 核 4G 起），能 SSH 登录，有公网 IP
+- 一个域名，能改 DNS 的 A 记录
+- 百炼 `apiKey`，以及智能体应用 `appId`（或模型名 `model`）
+- 钉钉企业内部应用的 `AppKey` / `AppSecret` / `CorpId`（不用钉钉登录可不填）
+- 服务器安全组放行 `22`、`80`、`443`；**不要放行 8787**
+
+下面命令默认以 `root` 执行；用普通用户时自行加 `sudo`。先设两个变量，后面直接复制：
+
+```bash
+export DOMAIN=ai.example.com          # 换成你的域名
+export APP_DIR=/opt/ai-assistant      # 部署目录
+```
+
+### 1. 安装 Docker
 
 ```bash
 apt update
-apt install -y nginx certbot python3-certbot-nginx curl ca-certificates
-# Node 20+（服务器只跑代理；前端构建在本地做）
-curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-apt install -y nodejs
-node -v
+apt install -y git curl
+curl -fsSL https://get.docker.com | sh -s -- --mirror Aliyun
+systemctl enable --now docker
+docker --version
+docker compose version
 ```
 
-国内下载慢可换 npmmirror 的 Node 二进制或清华 Nodesource 镜像。
+两条版本命令都有输出即可。`docker compose` 报不存在时：`apt install -y docker-compose-plugin`。
 
-### 2. 本地构建
+### 2. 拉代码
 
 ```bash
-git clone https://github.com/liyong11/zhongtong-lenglian-ai-assistant.git
-cd zhongtong-lenglian-ai-assistant
-pnpm install
-pnpm test && pnpm build
+git clone https://github.com/liyong11/zhongtong-lenglian-ai-assistant.git "$APP_DIR"
+cd "$APP_DIR"
 ```
 
-构建机需要 Node ≥ 20.19 或 ≥ 22.12（Vite 7 要求），产物在 `dist/`。
+目录已存在时改成 `cd "$APP_DIR" && git pull`。
 
-### 3. 上传运行文件
-
-只传运行必需文件，**不要整仓上传**：
+### 3. 配置域名和密钥
 
 ```bash
-ssh root@<新服务器IP> 'mkdir -p /opt/ai-assistant/bailian-proxy'
-rsync -az --partial \
-  bailian-proxy/server.js bailian-proxy/dingtalk.js bailian-proxy/config.example.json \
-  root@<新服务器IP>:/opt/ai-assistant/bailian-proxy/
-rsync -az --partial --exclude .DS_Store dist/ \
-  root@<新服务器IP>:/opt/ai-assistant/dist/
+cp .env.example .env
+vi .env
 ```
 
-不要上传本地的 `config.json`、`sidebar.json`、`sessions.json`、`uploads/`、`*.log`：前者是敏感线上配置，后者是旧环境的运行时数据（新环境从空开始，由后台生成）。
+`.env` 最少改两项：
 
-### 4. 创建配置
+```dotenv
+DOMAIN=ai.example.com          # 必须是域名，不带 https:// 和结尾斜杠
+ADMIN_TOKEN=换成一串随机字符     # openssl rand -hex 24 可生成
+```
+
+`ADMIN_TOKEN` 是没启用钉钉登录时的后台口令，必须设，否则后台对公网开放。其余项保持默认。
 
 ```bash
-ssh root@<新服务器IP> '
-  cd /opt/ai-assistant/bailian-proxy &&
-  cp config.example.json config.json &&
-  chmod 600 config.json &&
-  vi config.json'
+chmod 600 .env
 ```
 
-最少填 `apiKey`，并填 `appId`（智能体应用，推荐）或 `model`（模型直调）之一。字段说明见下方「配置」。之后所有修改都走 `/admin`，不再手改文件。
+### 4. 首次配置
 
-> 公网部署必须开启鉴权：配钉钉凭据（`dingtalkAppKey` / `dingtalkAppSecret`）或设 `ADMIN_TOKEN`。两者都不配时，管理后台对本机开放。
-
-### 5. systemd 常驻
+先建数据目录，再把示例配置复制成正式配置：
 
 ```bash
-cat >/etc/systemd/system/ai-assistant.service <<'EOF'
-[Unit]
-Description=ZTO Cold Chain AI Assistant
-After=network.target
-
-[Service]
-Type=simple
-User=www-data
-Group=www-data
-WorkingDirectory=/opt/ai-assistant/bailian-proxy
-ExecStart=/usr/bin/node server.js
-Restart=always
-RestartSec=3
-Environment=PORT=8787
-Environment=PUBLIC_ORIGIN=https://<你的域名>
-Environment=CHAT_RATE_LIMIT=30
-Environment=SSE_MAX_CONCURRENT=100
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-chown -R www-data:www-data /opt/ai-assistant
-chmod 600 /opt/ai-assistant/bailian-proxy/config.json
-systemctl daemon-reload
-systemctl enable --now ai-assistant
-systemctl status ai-assistant --no-pager
+mkdir -p data
+cp bailian-proxy/config.example.json data/config.json
+chmod 600 data/config.json
+vi data/config.json
 ```
 
-- `PUBLIC_ORIGIN` 必填最终 HTTPS 地址，钉钉回调地址按它生成。
-- `command -v node` 若不是 `/usr/bin/node`（nvm 安装），把 `ExecStart` 改成实际路径。
-- 改完变量或代码：`systemctl restart ai-assistant`；日志 `journalctl -u ai-assistant -f`。
-- 团队统一用 pm2 时，可改为 `pm2 start server.js --name ai-assistant && pm2 save`，与 systemd 二选一。
+最少改成这样（JSON 不能写注释）：
 
-### 6. nginx + HTTPS
-
-先写 HTTP vhost（`ai.example.com` 换成你的域名），`/etc/nginx/sites-available/ai-assistant.conf`：
-
-```nginx
-server {
-    listen 80;
-    server_name ai.example.com;
-    client_max_body_size 10m;
-
-    # SSE 流式对话：关缓冲、拉长读超时
-    location = /api/chat/stream {
-        proxy_pass http://127.0.0.1:8787;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-Host $host;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header Connection "";
-        proxy_buffering off;
-        proxy_cache off;
-        proxy_read_timeout 300s;
-    }
-
-    location / {
-        proxy_pass http://127.0.0.1:8787;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-Host $host;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_read_timeout 120s;
-    }
+```json
+{
+  "apiKey": "sk-你的百炼APIKey",
+  "appId": "你的智能体应用ID",
+  "model": "",
+  "systemPrompt": "你是中通冷链订单管理系统的智能助理「小冷」……",
+  "dingtalkAppKey": "",
+  "dingtalkAppSecret": "",
+  "dingtalkCorpId": "",
+  "adminUsers": []
 }
 ```
 
-```bash
-ln -s /etc/nginx/sites-available/ai-assistant.conf /etc/nginx/sites-enabled/
-nginx -t && systemctl reload nginx
+- `appId` 与 `model` 二选一：用百炼智能体应用就填 `appId`、`model` 留空；直调模型就 `appId` 留空、`model` 填如 `qwen-plus`。
+- 用钉钉登录时填 `dingtalkAppKey` / `dingtalkAppSecret` / `dingtalkCorpId`，`ADMIN_TOKEN` 可留空。
+- 检查 JSON 合法性：`python3 -m json.tool data/config.json >/dev/null && echo OK`。
 
-# DNS 的 A 记录先指向新服务器 IP，再签证书
-certbot --nginx -d ai.example.com --redirect
-```
-
-certbot 会复制上面的 server 块加 443 和证书，location 里的 SSE 设置会保留；证书自动续期。
-
-> 用宝塔面板时：vhost 放 `/www/server/panel/vhost/nginx/`，证书在面板申请，location 内容照抄。
-
-### 7. 防火墙
-
-安全组/防火墙只放行 22、80、443；**不要放行 8787**，应用只给 nginx 本机反代。
-
-### 8. 钉钉（启用钉钉登录时）
-
-- 开放平台 → 应用开发 → 登录与分享 → 授权回调地址：`https://<你的域名>/api/auth/dingtalk/callback`
-- 应用开发 → 安全设置 → 服务器出口 IP：加入新服务器公网出口 IP（服务器上 `curl -s ifconfig.me` 查看），否则报 `60020 访问ip不在白名单之中`。
-- 需要限制哪些站点能嵌入气泡：`/admin` 填「允许嵌入域名」；开了 `embedToken` 后引用 `/embed.js` 要带 `?token=`。
-
-### 9. 验证
+关键一步：容器内进程 uid 是 `1000`，数据目录必须让它可写：
 
 ```bash
-curl -fsS https://<你的域名>/api/ping
-# {"success":true,"mode":"app","configured":true,...}
-curl -fsSI https://<你的域名>/embed.js | head -1
+chown -R 1000:1000 data
+chmod 600 data/config.json
 ```
 
-再打开 `https://<你的域名>/`（气泡）、`/admin`（后台）、第三方引用页，实际发一条消息确认逐字流式正常。首次登录后台后，立刻在「人员设置」勾选管理员（一个都没勾选时全员可登录，属首次引导逻辑）。
-
-### 10. 日常发布
+DNS 也要先指过来（Caddy 启动时就要签证书）：
 
 ```bash
-pnpm test && pnpm build
-
-# sidebar.json 是后台可改的运行时数据：服务器上已生成时先回拉，避免发布覆盖线上配置
-scp root@<新服务器IP>:/opt/ai-assistant/bailian-proxy/sidebar.json bailian-proxy/sidebar.json 2>/dev/null || true
-
-rsync -az --partial \
-  bailian-proxy/server.js bailian-proxy/dingtalk.js bailian-proxy/sidebar.json \
-  bailian-proxy/config.example.json \
-  root@<新服务器IP>:/opt/ai-assistant/bailian-proxy/
-rsync -az --partial --exclude .DS_Store dist/ \
-  root@<新服务器IP>:/opt/ai-assistant/dist/
-
-ssh root@<新服务器IP> 'chown -R www-data:www-data /opt/ai-assistant && systemctl restart ai-assistant'
-curl -fsS https://<你的域名>/api/ping
+dig +short "$DOMAIN"       # 输出应为服务器公网 IP；没有就等 DNS 生效
 ```
 
-`chown` 不能省：rsync 以 root 落盘，而进程是 `www-data`，不 chown 后台就写不了 `sidebar.json`。`dist/` 同步不要加 `--delete`：已打开的页面还在引用旧 hash chunk。
+### 5. 启动
 
-### 11. 迁移旧环境（可选）
+```bash
+docker compose up -d --build
+```
 
-从旧服务器只取三样：`bailian-proxy/config.json`（API Key/钉钉凭据）、`bailian-proxy/sidebar.json`（值班表/FAQ/人员/形象）、`bailian-proxy/uploads/`（头像）。上传后 `chown -R www-data:www-data /opt/ai-assistant && systemctl restart ai-assistant`，再更新钉钉回调地址与出口 IP 白名单。
+首次要构建前端镜像，约 2~5 分钟。看状态和日志：
 
-### 部署红线
+```bash
+docker compose ps                    # app 应为 healthy，caddy 为 running
+docker compose logs -f app           # Ctrl+C 退出日志
+docker compose logs --tail 50 caddy  # 证书申请进度
+```
 
-- `bailian-proxy/config.json` 含百炼 API Key 与钉钉凭据：只在服务器上存在，权限 600，只能通过 `/admin` 修改，不进 git、不从本地覆盖。
-- `sidebar.json`、`sessions.json`、`uploads/`、`*.log` 是运行时数据，发布时用白名单 rsync 避开。
-- SSE `/api/chat/stream` 的 `proxy_buffering off`、`proxy_cache off`、`proxy_read_timeout 300s`、`X-Forwarded-Host` 缺一不可，否则逐字流失效或回跳地址错误。
-- `PUBLIC_ORIGIN`、钉钉回调地址、DNS 三者必须一致，否则扫码登录报 redirect_uri 错误。
+容器时区已固定为 `Asia/Shanghai`，值班日期不会因为服务器时区跑偏。
+
+改 `.env` 或 `docker-compose.yml` 后要让容器重建才生效：`docker compose up -d`。
+
+### 6. 验证
+
+```bash
+curl -fsS "https://$DOMAIN/api/ping"
+# 期望：{"success":true,"mode":"app","configured":true,...}
+```
+
+`configured` 为 `false` 说明 `data/config.json` 的 `apiKey`、`appId`/`model` 没填对。
+
+```bash
+curl -fsS "https://$DOMAIN/embed.js" | head -3     # 应输出嵌入脚本
+curl -fsSI "https://$DOMAIN/" | head -1            # 应返回 200
+```
+
+再实测一次流式：
+
+```bash
+curl -N -X POST "https://$DOMAIN/api/chat/stream" \
+  -H 'Content-Type: application/json' \
+  -d '{"prompt":"你好"}'
+```
+
+应先出现 `event: ready`，随后陆续输出 `data:` 片段；一次性全出说明 Caddy 的 `flush_interval -1` 没生效（检查 `Caddyfile` 是否挂载）。
+
+### 7. 钉钉登录（可选）
+
+不启用就跳过，用 `ADMIN_TOKEN` 进后台。
+
+1. 钉钉开放平台创建企业内部应用，记下 `AppKey`、`AppSecret`、企业 `CorpId`，填进 `data/config.json` 或后台。
+2. 「登录与分享」→ 授权回调地址填：`https://$DOMAIN/api/auth/dingtalk/callback`
+3. 「安全设置」→ 服务器出口 IP：填服务器公网出口 IP，容器走宿主机 NAT，所以填宿主机的：
+   ```bash
+   curl -s ifconfig.me
+   ```
+   不填会报 `60020 访问ip不在白名单之中`。
+4. 开通通讯录读取相关权限并发布应用版本，否则扫码后拿不到用户信息。
+5. 改完配置重启：`docker compose restart app`。
+
+回调地址由 `PUBLIC_ORIGIN` 固定（compose 里已按 `https://$DOMAIN` 注入），必须和开放平台登记的一字不差。
+
+### 8. 后台初始化
+
+打开 `https://$DOMAIN/admin`：
+
+- 配了钉钉凭据：扫码登录；否则输入 `.env` 里的 `ADMIN_TOKEN`。
+- 第一次登录后立刻到「人员设置」勾选管理员并保存（一个管理员都没勾选时全员可登录，属首次引导逻辑）。
+- 依次配置：机器人形象（名称/头像）、值班表、下载汇总、常见问题、人员。
+- 需要限制嵌入站点时填「允许嵌入域名」；需要口令时设「嵌入口令」。
+
+所有后台修改都写进 `data/` 目录，重启/重新构建不丢。
+
+### 9. 嵌入第三方页面
+
+在对方页面 `</body>` 前：
+
+```html
+<script src="https://ai.example.com/embed.js" data-title="小冷"></script>
+```
+
+设了嵌入口令则用 `.../embed.js?token=口令`。对方站点有 CSP 时放行：
+
+```text
+script-src https://ai.example.com
+frame-src https://ai.example.com
+```
+
+### 10. 日常更新与回滚
+
+```bash
+cd /opt/ai-assistant
+
+# 更新前备份
+tar czf "backup-$(date +%F-%H%M).tgz" data .env
+
+git pull
+docker compose up -d --build
+docker compose ps
+curl -fsS "https://$(grep '^DOMAIN=' .env | cut -d= -f2)/api/ping"
+```
+
+回滚到上一个提交：
+
+```bash
+git log --oneline -5
+git checkout <上一个提交号>
+docker compose up -d --build
+```
+
+`data/` 不在 git 里，更新和回滚都不会动配置。旧镜像可清理：`docker image prune -f`。
+
+### 11. 备份、恢复、迁移
+
+备份（配置里有 API Key，注意保管）：
+
+```bash
+cd /opt/ai-assistant
+tar czf "backup-$(date +%F-%H%M).tgz" data .env
+```
+
+恢复到新机器：装 Docker → 拉代码 → 解开备份到 `$APP_DIR` → `chown -R 1000:1000 data` → `docker compose up -d --build`。
+
+从旧服务器迁移，只拷三样到 `data/`：
+
+```bash
+scp root@旧服务器:/opt/aitalk/bailian-proxy/config.json  data/
+scp root@旧服务器:/opt/aitalk/bailian-proxy/sidebar.json data/
+scp -r root@旧服务器:/opt/aitalk/bailian-proxy/uploads   data/
+chown -R 1000:1000 data
+docker compose up -d
+```
+
+然后更新钉钉回调地址、出口 IP、DNS。
+
+### 12. 故障排查
+
+| 现象 | 原因与处理 |
+| --- | --- |
+| `docker compose up` 拉镜像超时 | 默认已用 DaoCloud 国内镜像；仍失败时在 `.env` 改 `NODE_IMAGE` / `CADDY_IMAGE`，或配 Docker 镜像加速 |
+| Caddy 日志报签证书失败 | DNS 没指向本机、80/443 没放行、或域名走了 Cloudflare 橙云代理。先 `dig +short $DOMAIN`；橙云改灰云或改用 DNS 验证 |
+| 访问 502 | `docker compose ps` 看 app 是否 healthy，`docker compose logs --tail 100 app` |
+| app 起不来，日志 `EACCES /data` | `chown -R 1000:1000 data` 后 `docker compose restart app` |
+| `/api/ping` 的 `configured` 为 false | `data/config.json` 没填 `apiKey` 或没填 `appId`/`model`；改完 `docker compose restart app` |
+| 扫码报 redirect_uri 错误 | `.env` 的 `DOMAIN`、`PUBLIC_ORIGIN`、钉钉登记的回调地址三者不一致 |
+| 钉钉报 `60020` | 钉钉后台「服务器出口 IP」没加宿主机公网 IP |
+| 回答不逐字输出 | `Caddyfile` 没挂载或少了 `flush_interval -1`；`docker compose restart caddy` |
+| 后台登录后又跳登录页 | 必须用 HTTPS；检查 `data/` 写权限和浏览器是否禁 Cookie |
+| 上传头像失败 | `data/uploads` 权限不对，`chown -R 1000:1000 data` |
+| 80/443 被占用 | 宿主机已有 nginx/宝塔：停掉它，或改 Caddy 端口（改完域名访问要带端口，不推荐） |
+| 配置改坏了 | 服务器会留 `data/config.json.corrupt-时间戳`；从备份恢复或重填 |
+
+常用命令：
+
+```bash
+docker compose ps
+docker compose logs -f app
+docker compose logs -f caddy
+docker compose restart app
+docker compose down            # 停止（data 不受影响）
+docker compose up -d           # 再启动
+```
+
+### 13. 不想用 Docker
+
+按 git 历史里的 systemd + nginx 方案部署（`git show bb8860f:README.md`），需要服务器装 Node 20+、nginx、certbot。功能一致，步骤更多。
 
 ## 配置
 
@@ -289,11 +358,16 @@ https://你的域名/api/auth/dingtalk/callback
 ## 目录结构
 
 ```
-bailian-proxy/   Node 代理（API 转发、静态托管、管理接口）
-src/             Vue 前端（ChatWidget 气泡 / AdminView 后台 / 纯函数与单测）
-public/          embed.js 嵌入脚本
-docs/            EMBEDDING.md 嵌入说明、prototype/ 早期静态原型（仅存档）
-dist/            构建产物（git 忽略）
+bailian-proxy/     Node 代理（API 转发、静态托管、管理接口）
+src/               Vue 前端（ChatWidget 气泡 / AdminView 后台 / 纯函数与单测）
+public/            embed.js 嵌入脚本
+docs/              EMBEDDING.md 嵌入说明、prototype/ 早期静态原型（仅存档）
+dist/              构建产物（git 忽略）
+Dockerfile         多阶段构建：Vite 打包 + Node 运行
+docker-compose.yml app + caddy 两个容器
+Caddyfile          自动 HTTPS 与 SSE 反代
+.env.example       域名、管理令牌、镜像源模板
+data/              运行时数据（git 忽略，容器挂到 /data）
 ```
 
 ## 测试
