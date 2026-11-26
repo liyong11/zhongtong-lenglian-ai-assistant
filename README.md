@@ -24,71 +24,116 @@ pnpm start          # 启动代理，默认端口 8787（PORT 环境变量可覆
 
 开发模式：`pnpm dev`（Vite 5173，`/api` 自动代理到 8787，需同时跑 `pnpm dev:server`）。
 
-## 部署（Linux 服务器）
+## 部署（新服务器）
 
-线上：<https://aitalk.beta.ztocc.com>（`*.beta.ztocc.com` 通配符证书，DNS 无需单独解析）。
+面向一台全新的 Linux 服务器（命令按 Ubuntu/Debian 写）。旧线上实例 `https://aitalk.beta.ztocc.com` 仅作参考，新环境把域名、IP、证书换成自己的即可。
 
-| 项 | 值 |
-| --- | --- |
-| 服务器 | 公司 A `root@121.199.175.111`；个人 B（跳板）`root@42.192.205.206` |
-| 连接 | 先直连 A，超时再走 B：`ssh -J root@42.192.205.206 root@121.199.175.111` |
-| 应用目录 | `/opt/aitalk`（`dist/` + `bailian-proxy/`） |
-| 进程 | pm2 名称 `aitalk`；Node v24（nvm：`/root/.nvm/versions/node/v24.11.0/bin`） |
-| 端口 | 应用监听 `8787`，仅供 nginx 本机反代；安全组**不要**放行 8787 |
-| nginx | `/www/server/panel/vhost/nginx/aitalk.beta.ztocc.com.conf`（宝塔目录） |
-| 证书 | `/www/server/panel/vhost/letsencrypt/beta.ztocc.com/`（acme 自动续期，新子域名直接复用） |
+运行形态：一个 Node 进程（`bailian-proxy/server.js`，**零外部依赖**）监听 `8787`，托管 `dist/` 和 API；前面由 nginx 终结 HTTPS 并转发 SSE。
 
-后端只用 Node 内置模块，**服务器上不需要 `pnpm install` 或 `node_modules`**；换服务器时把 IP、域名、证书路径换掉，其余步骤相同。
+```
+/opt/ai-assistant/
+├── bailian-proxy/     # server.js、dingtalk.js、config.json、sidebar.json、uploads/
+└── dist/              # 前端构建产物（必须与 bailian-proxy 同级）
+```
 
-### 首次部署
+### 1. 服务器准备
 
 ```bash
-# 1. 本地准备（Node ≥ 20、pnpm）并构建
+apt update
+apt install -y nginx certbot python3-certbot-nginx curl ca-certificates
+# Node 20+（服务器只跑代理；前端构建在本地做）
+curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+apt install -y nodejs
+node -v
+```
+
+国内下载慢可换 npmmirror 的 Node 二进制或清华 Nodesource 镜像。
+
+### 2. 本地构建
+
+```bash
 git clone https://github.com/liyong11/zhongtong-lenglian-ai-assistant.git
 cd zhongtong-lenglian-ai-assistant
 pnpm install
-pnpm test && pnpm build          # 产物在 dist/
-
-# 2. 建目录 + 白名单上传（绝不整仓上传）
-ssh root@121.199.175.111 'mkdir -p /opt/aitalk/bailian-proxy'
-rsync -az --partial \
-  bailian-proxy/server.js bailian-proxy/dingtalk.js bailian-proxy/config.example.json \
-  root@121.199.175.111:/opt/aitalk/bailian-proxy/
-rsync -az --partial --exclude .DS_Store dist/ \
-  root@121.199.175.111:/opt/aitalk/dist/
-
-# 3. 首次配置（只填一次，之后全部走 /admin）
-ssh root@121.199.175.111 '
-  cd /opt/aitalk/bailian-proxy &&
-  cp config.example.json config.json && chmod 600 config.json && vi config.json'
-  # apiKey 必填；appId 与 model 二选一
-
-# 4. 启动 + 开机自启
-ssh root@121.199.175.111 '
-  export PATH=/root/.nvm/versions/node/v24.11.0/bin:$PATH
-  cd /opt/aitalk
-  pm2 start bailian-proxy/server.js --name aitalk
-  pm2 startup       # 若提示未配置，按输出的命令执行一次
-  pm2 save'
+pnpm test && pnpm build
 ```
 
-nginx vhost（与线上一致，SSE 相关项不能删）：
+构建机需要 Node ≥ 20.19 或 ≥ 22.12（Vite 7 要求），产物在 `dist/`。
+
+### 3. 上传运行文件
+
+只传运行必需文件，**不要整仓上传**：
+
+```bash
+ssh root@<新服务器IP> 'mkdir -p /opt/ai-assistant/bailian-proxy'
+rsync -az --partial \
+  bailian-proxy/server.js bailian-proxy/dingtalk.js bailian-proxy/config.example.json \
+  root@<新服务器IP>:/opt/ai-assistant/bailian-proxy/
+rsync -az --partial --exclude .DS_Store dist/ \
+  root@<新服务器IP>:/opt/ai-assistant/dist/
+```
+
+不要上传本地的 `config.json`、`sidebar.json`、`sessions.json`、`uploads/`、`*.log`：前者是敏感线上配置，后者是旧环境的运行时数据（新环境从空开始，由后台生成）。
+
+### 4. 创建配置
+
+```bash
+ssh root@<新服务器IP> '
+  cd /opt/ai-assistant/bailian-proxy &&
+  cp config.example.json config.json &&
+  chmod 600 config.json &&
+  vi config.json'
+```
+
+最少填 `apiKey`，并填 `appId`（智能体应用，推荐）或 `model`（模型直调）之一。字段说明见下方「配置」。之后所有修改都走 `/admin`，不再手改文件。
+
+> 公网部署必须开启鉴权：配钉钉凭据（`dingtalkAppKey` / `dingtalkAppSecret`）或设 `ADMIN_TOKEN`。两者都不配时，管理后台对本机开放。
+
+### 5. systemd 常驻
+
+```bash
+cat >/etc/systemd/system/ai-assistant.service <<'EOF'
+[Unit]
+Description=ZTO Cold Chain AI Assistant
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/ai-assistant/bailian-proxy
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=3
+Environment=PORT=8787
+Environment=PUBLIC_ORIGIN=https://<你的域名>
+Environment=CHAT_RATE_LIMIT=30
+Environment=SSE_MAX_CONCURRENT=100
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+chown -R www-data:www-data /opt/ai-assistant
+chmod 600 /opt/ai-assistant/bailian-proxy/config.json
+systemctl daemon-reload
+systemctl enable --now ai-assistant
+systemctl status ai-assistant --no-pager
+```
+
+- `PUBLIC_ORIGIN` 必填最终 HTTPS 地址，钉钉回调地址按它生成。
+- `command -v node` 若不是 `/usr/bin/node`（nvm 安装），把 `ExecStart` 改成实际路径。
+- 改完变量或代码：`systemctl restart ai-assistant`；日志 `journalctl -u ai-assistant -f`。
+- 团队统一用 pm2 时，可改为 `pm2 start server.js --name ai-assistant && pm2 save`，与 systemd 二选一。
+
+### 6. nginx + HTTPS
+
+先写 HTTP vhost（`ai.example.com` 换成你的域名），`/etc/nginx/sites-available/ai-assistant.conf`：
 
 ```nginx
 server {
     listen 80;
-    server_name aitalk.beta.ztocc.com;
-    return 301 https://$host$request_uri;
-}
-
-server {
-    listen 443 ssl;
-    http2 on;
-    server_name aitalk.beta.ztocc.com;
-
-    ssl_certificate /www/server/panel/vhost/letsencrypt/beta.ztocc.com/fullchain.pem;
-    ssl_certificate_key /www/server/panel/vhost/letsencrypt/beta.ztocc.com/privkey.pem;
-    ssl_protocols TLSv1.2 TLSv1.3;
+    server_name ai.example.com;
     client_max_body_size 10m;
 
     # SSE 流式对话：关缓冲、拉长读超时
@@ -97,7 +142,7 @@ server {
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Host $host;
-        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header Connection "";
         proxy_buffering off;
@@ -110,57 +155,76 @@ server {
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Host $host;
-        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_read_timeout 120s;
     }
 }
 ```
 
-放到宝塔 vhost 目录后 `nginx -t && nginx -s reload`（宝塔安装的 nginx，vhost 不在 `/etc/nginx`）。
-
 ```bash
-# 5. 验证
-curl -fsS https://aitalk.beta.ztocc.com/api/ping      # {"success":true,...}
-curl -fsSI https://aitalk.beta.ztocc.com/embed.js | head -1
+ln -s /etc/nginx/sites-available/ai-assistant.conf /etc/nginx/sites-enabled/
+nginx -t && systemctl reload nginx
+
+# DNS 的 A 记录先指向新服务器 IP，再签证书
+certbot --nginx -d ai.example.com --redirect
 ```
 
-配置了钉钉登录时，还要在钉钉开放平台补两处：授权回调地址 `https://aitalk.beta.ztocc.com/api/auth/dingtalk/callback`；安全设置 → 服务器出口 IP 加入 A 的公网出口 IP，否则报 `60020 访问ip不在白名单之中`。
+certbot 会复制上面的 server 块加 443 和证书，location 里的 SSE 设置会保留；证书自动续期。
 
-### 日常发布（改代码后）
+> 用宝塔面板时：vhost 放 `/www/server/panel/vhost/nginx/`，证书在面板申请，location 内容照抄。
+
+### 7. 防火墙
+
+安全组/防火墙只放行 22、80、443；**不要放行 8787**，应用只给 nginx 本机反代。
+
+### 8. 钉钉（启用钉钉登录时）
+
+- 开放平台 → 应用开发 → 登录与分享 → 授权回调地址：`https://<你的域名>/api/auth/dingtalk/callback`
+- 应用开发 → 安全设置 → 服务器出口 IP：加入新服务器公网出口 IP（服务器上 `curl -s ifconfig.me` 查看），否则报 `60020 访问ip不在白名单之中`。
+- 需要限制哪些站点能嵌入气泡：`/admin` 填「允许嵌入域名」；开了 `embedToken` 后引用 `/embed.js` 要带 `?token=`。
+
+### 9. 验证
+
+```bash
+curl -fsS https://<你的域名>/api/ping
+# {"success":true,"mode":"app","configured":true,...}
+curl -fsSI https://<你的域名>/embed.js | head -1
+```
+
+再打开 `https://<你的域名>/`（气泡）、`/admin`（后台）、第三方引用页，实际发一条消息确认逐字流式正常。首次登录后台后，立刻在「人员设置」勾选管理员（一个都没勾选时全员可登录，属首次引导逻辑）。
+
+### 10. 日常发布
 
 ```bash
 pnpm test && pnpm build
 
-# sidebar.json 是后台可改的运行时数据却又被 git 跟踪：先回拉，避免把线上修改覆盖回旧版
-scp root@121.199.175.111:/opt/aitalk/bailian-proxy/sidebar.json bailian-proxy/sidebar.json
+# sidebar.json 是后台可改的运行时数据：服务器上已生成时先回拉，避免发布覆盖线上配置
+scp root@<新服务器IP>:/opt/ai-assistant/bailian-proxy/sidebar.json bailian-proxy/sidebar.json 2>/dev/null || true
 
 rsync -az --partial \
   bailian-proxy/server.js bailian-proxy/dingtalk.js bailian-proxy/sidebar.json \
   bailian-proxy/config.example.json \
-  root@121.199.175.111:/opt/aitalk/bailian-proxy/
+  root@<新服务器IP>:/opt/ai-assistant/bailian-proxy/
 rsync -az --partial --exclude .DS_Store dist/ \
-  root@121.199.175.111:/opt/aitalk/dist/
+  root@<新服务器IP>:/opt/ai-assistant/dist/
 
-ssh root@121.199.175.111 'export PATH=/root/.nvm/versions/node/v24.11.0/bin:$PATH;
-  pm2 restart aitalk --update-env && pm2 save'
-curl -fsS https://aitalk.beta.ztocc.com/api/ping
+ssh root@<新服务器IP> 'chown -R www-data:www-data /opt/ai-assistant && systemctl restart ai-assistant'
+curl -fsS https://<你的域名>/api/ping
 ```
 
-直连超时就给 `ssh` / `scp` / `rsync` 加跳板：`ssh -J root@42.192.205.206 ...`、`rsync -e 'ssh -J root@42.192.205.206' ...`。
+`chown` 不能省：rsync 以 root 落盘，而进程是 `www-data`，不 chown 后台就写不了 `sidebar.json`。`dist/` 同步不要加 `--delete`：已打开的页面还在引用旧 hash chunk。
+
+### 11. 迁移旧环境（可选）
+
+从旧服务器只取三样：`bailian-proxy/config.json`（API Key/钉钉凭据）、`bailian-proxy/sidebar.json`（值班表/FAQ/人员/形象）、`bailian-proxy/uploads/`（头像）。上传后 `chown -R www-data:www-data /opt/ai-assistant && systemctl restart ai-assistant`，再更新钉钉回调地址与出口 IP 白名单。
 
 ### 部署红线
 
-- `bailian-proxy/config.json`（API Key、钉钉凭据、白名单）只存在于服务器，只能通过 `/admin` 修改，**不从本地覆盖、不进 git**。
-- `sidebar.json`、`sessions.json`、`uploads/`、`*.log` 是运行时数据，rsync 白名单天然避开；发布前先回拉 `sidebar.json`。
-- `dist/` 同步不要加 `--delete`：已打开的页面还在引用旧 hash chunk。
-- SSE `/api/chat/stream` 的 `proxy_buffering off`、`proxy_cache off`、`proxy_read_timeout 300s`、`X-Forwarded-Host` 缺一不可，否则逐字流式失效。
-- 改环境变量时用 `pm2 restart aitalk --update-env`，但要把所有变量显式重设一遍（`--update-env` 只增不改不清）：
-
-  ```bash
-  ssh root@121.199.175.111 'export PATH=/root/.nvm/versions/node/v24.11.0/bin:$PATH;
-    SSE_MAX_CONCURRENT=100 CHAT_RATE_LIMIT=30 pm2 restart aitalk --update-env && pm2 save'
-  ```
+- `bailian-proxy/config.json` 含百炼 API Key 与钉钉凭据：只在服务器上存在，权限 600，只能通过 `/admin` 修改，不进 git、不从本地覆盖。
+- `sidebar.json`、`sessions.json`、`uploads/`、`*.log` 是运行时数据，发布时用白名单 rsync 避开。
+- SSE `/api/chat/stream` 的 `proxy_buffering off`、`proxy_cache off`、`proxy_read_timeout 300s`、`X-Forwarded-Host` 缺一不可，否则逐字流失效或回跳地址错误。
+- `PUBLIC_ORIGIN`、钉钉回调地址、DNS 三者必须一致，否则扫码登录报 redirect_uri 错误。
 
 ## 配置
 
@@ -175,6 +239,8 @@ curl -fsS https://aitalk.beta.ztocc.com/api/ping
 | `dingtalkAppKey` / `dingtalkAppSecret` | 钉钉企业内部应用凭据；配置后管理后台强制钉钉登录（扫码 + 钉钉内免登） |
 | `dingtalkCorpId` | 企业 CorpId，用于钉钉客户端内自动免登 |
 | `adminUsers` | 钉钉 userId 白名单数组；留空表示企业内所有登录用户均可进后台 |
+| `allowedDomains` | 允许 iframe 嵌入本组件的站点域名（空格分隔）；留空不限制，由 CSP `frame-ancestors` 生效 |
+| `embedToken` | 嵌入口令；设置后 `/embed.js` 必须带 `?token=` 才下发 |
 
 也可用环境变量 `DINGTALK_APP_KEY` / `DINGTALK_APP_SECRET` / `DINGTALK_CORP_ID` 覆盖钉钉配置。
 
