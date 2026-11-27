@@ -26,10 +26,12 @@ pnpm start          # 启动代理，默认端口 8787（PORT 环境变量可覆
 
 ## 部署（Docker）
 
-单容器部署：Node 进程直接对外监听 `8787`，不依赖域名、DNS 和证书。前端构建在镜像里完成，服务器只要 Docker。
+双端口部署：公共端口 `8787` 只服务气泡、对话和嵌入脚本；管理端口 `8788` 只服务 `/admin` 后台。管理端口默认不对外，给内网用时改绑定地址并限制防火墙。服务器只要 Docker。
 
 ```
-访问者 → app 容器 :8787 → /data（配置、会话、上传文件）
+用户/公网 → app:8787（气泡、对话、embed.js）
+内网      → app:8788（/admin 后台）
+两者共用 /data（配置、会话、上传文件）
 ```
 
 > 以后要挂到 HTTPS 域名后面，见文末「可选：放到 HTTPS 后面」。
@@ -37,7 +39,7 @@ pnpm start          # 启动代理，默认端口 8787（PORT 环境变量可覆
 ### 0. 准备清单
 
 - 一台 Linux 服务器（Ubuntu 22.04/24.04，2 核 4G 起），能 SSH 登录
-- 安全组/防火墙放行 `22` 和 `8787`（最好只放行公司网段）
+- 安全组/防火墙放行 `22`、`8787`；`8788` 只对內网开放，**不要对公网放行**
 - 百炼 `apiKey`，以及智能体应用 `appId`（或模型名 `model`）
 - 钉钉应用凭据（可选；纯 HTTP 部署先不要启用钉钉登录，见第 7 步）
 
@@ -76,18 +78,21 @@ cp .env.example .env
 vi .env
 ```
 
-最少确认这两项：
+最少确认这几项：
 
 ```dotenv
-APP_PORT=8787          # 对外端口，被占用就换一个
-APP_BIND=0.0.0.0       # 直接对外；只让本机反代时改 127.0.0.1
+APP_PORT=8787            # 公共端口：气泡、对话、嵌入脚本
+APP_BIND=0.0.0.0         # 公共端口直接对外；只让本机反代时改 127.0.0.1
+ADMIN_PORT=8788          # 管理端口：只服务 /admin
+ADMIN_HOST_BIND=0.0.0.0  # 管理端口绑定：仅本机用 127.0.0.1；内网填内网网卡 IP 或 0.0.0.0
 ADMIN_TOKEN=换成一串随机字符
 ```
 
-- `ADMIN_TOKEN` 是 `/admin` 的后台口令，自己编，不是系统生成；`openssl rand -hex 24` 可生成。
-- 服务器只有你能访问（纯内网）时可留空；只要别人也能打开这个地址，就必须设，否则后台对所有人开放。
+- 公共端口访问 `/admin`、`/api/admin/*`、`/api/auth/*` 会直接 404，只有 `8788` 能进后台。
+- `ADMIN_HOST_BIND` 控制宿主机把管理端口开到哪：`127.0.0.1` 仅本机（可 SSH 隧道访问），内网访问填内网网卡 IP 或 `0.0.0.0` 并配合安全组。
+- `ADMIN_TOKEN` 是 `/admin` 的后台口令，自己编，不是系统生成；`openssl rand -hex 24` 可生成。分端口模式下建议必须设。
 - 钉钉凭据也在 `.env` 里填（`DINGTALK_APP_KEY` / `DINGTALK_APP_SECRET` / `DINGTALK_CORP_ID`），见第 7 步。
-- HTTP 下令牌是明文传输，公网环境建议放到 HTTPS 反代后面再用。
+- HTTP 下令牌是明文传输，内网可以接受；公网管理不建议。
 
 ```bash
 chmod 600 .env
@@ -158,12 +163,15 @@ curl -fsS http://127.0.0.1:8787/api/ping
 ```bash
 curl -fsS http://127.0.0.1:8787/embed.js | head -3   # 应输出嵌入脚本
 curl -fsSI http://127.0.0.1:8787/ | head -1          # 应返回 200
+curl -fsSI http://127.0.0.1:8788/admin | head -1     # 应返回 200
+curl -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8787/admin  # 应为 404
 ```
 
-浏览器打开（换成服务器 IP）：
+浏览器打开：
 
 - 气泡：`http://<服务器IP>:8787/`
-- 后台：`http://<服务器IP>:8787/admin`
+- 后台：`http://<内网IP>:8788/admin`
+- 管理端口只绑了 `127.0.0.1` 时，用 SSH 隧道：`ssh -L 8788:127.0.0.1:8788 root@<服务器IP>`，再开 `http://127.0.0.1:8788/admin`
 
 再实测一次流式：
 
@@ -177,7 +185,9 @@ curl -N -X POST http://127.0.0.1:8787/api/chat/stream \
 
 ### 7. 钉钉登录（可选）
 
-钉钉扫码回调要求公网 HTTPS，**纯 HTTP/IP 部署不要启用**，用 `ADMIN_TOKEN` 即可。已经有 HTTPS 域名时：
+⚠️ 分端口模式下后台在 `8788`，而钉钉回调固定走公共域名 `8787`，公共端口又屏蔽了 `/api/auth/*`，所以**分端口部署不要启用钉钉登录**，后台用 `ADMIN_TOKEN`。确实要用钉钉，只能把 `ADMIN_PORT` 留空走单端口模式（后台与气泡同端口，不建议公网）。
+
+以下步骤仅适用于单端口 + 公网 HTTPS；纯 HTTP/IP 也用不了钉钉扫码。
 
 1. 钉钉开放平台创建企业内部应用，记下 `AppKey`、`AppSecret`、企业 `CorpId`，填进 `.env`：
    ```dotenv
@@ -199,7 +209,7 @@ curl -N -X POST http://127.0.0.1:8787/api/chat/stream \
 
 ### 8. 后台初始化
 
-打开 `http://<服务器IP>:8787/admin`：
+打开 `http://<内网IP>:8788/admin`（管理端口只绑 127.0.0.1 时走 SSH 隧道）：
 
 - 没配钉钉时输入 `.env` 里的 `ADMIN_TOKEN`。
 - 第一次登录后立刻到「人员设置」勾选管理员并保存（一个管理员都没勾选时全员可登录，属首次引导逻辑）。
@@ -275,6 +285,10 @@ docker compose up -d
 | 现象 | 原因与处理 |
 | --- | --- |
 | 浏览器打不开 `IP:8787` | 安全组/防火墙没放行 8787；`ss -lntp \| grep 8787` 看端口；`docker compose ps` 看容器 |
+| 公共端口打开 `/admin` 是 404 | 正常：后台只在 `8788`，公共端口故意屏蔽 |
+| 内网打不开 `IP:8788/admin` | `ADMIN_HOST_BIND` 还是 `127.0.0.1`；改成内网网卡 IP 或 `0.0.0.0`，并确认防火墙放行内网访问 |
+| 8788 被占用 | `.env` 改 `ADMIN_PORT`，例如 `8790`，再 `docker compose up -d` |
+| 8788 能从公网打开 | 立即改 `ADMIN_HOST_BIND` 或安全组，管理端口只应走内网 |
 | `docker compose up` 拉镜像超时 | 默认已用 DaoCloud 国内镜像；仍失败时在 `.env` 改 `NODE_IMAGE`，或配 Docker 镜像加速 |
 | app 起不来，日志 `EACCES /data` | `chown -R 1000:1000 data` 后 `docker compose restart app` |
 | `/api/ping` 的 `configured` 为 false | `data/config.json` 没填 `apiKey` 或没填 `appId`/`model`；改完 `docker compose restart app` |
@@ -324,7 +338,8 @@ docker compose up -d           # 再启动
    }
    ```
 
-3. 钉钉回调、嵌入地址都改用 HTTPS 域名。
+3. 嵌入地址、`PUBLIC_ORIGIN` 改用 HTTPS 域名。
+4. 只反代 `8787`；后台仍在 `8788` 内网端口，不要一起反代到公网。
 
 ### 14. 不想用 Docker
 

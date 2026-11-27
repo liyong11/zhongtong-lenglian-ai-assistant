@@ -24,6 +24,10 @@ const dingtalk = require('./dingtalk');
 
 const DIST_ROOT = path.resolve(__dirname, '../dist');
 const PORT = process.env.PORT || 8787;
+// 可选：管理端口。设置后，公共端口不再响应后台页面与后台接口
+const ADMIN_PORT = Number(process.env.ADMIN_PORT || 0);
+const ADMIN_BIND = process.env.ADMIN_BIND || '127.0.0.1';
+const ADMIN_ENABLED = ADMIN_PORT > 0 && ADMIN_PORT !== Number(PORT);
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
 const DATA_DIR = path.resolve(process.env.DATA_DIR || __dirname); // 运行时数据目录（Docker 里挂 /data）
 fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -612,7 +616,24 @@ function serveFile(res, filePath) {
 }
 
 // ---------- 主服务 ----------
-const server = http.createServer(async (req, res) => {
+// 分端口时：公共端口只留气泡/对话，后台页面与后台接口只在管理端口响应
+function isAdminPath(pathname, method) {
+  return pathname === '/admin' || pathname.startsWith('/admin/')
+    || pathname === '/login' || pathname.startsWith('/login/')
+    || pathname.startsWith('/api/auth/')
+    || pathname.startsWith('/api/admin/')
+    || pathname === '/api/upload'
+    || (pathname === '/api/sidebar' && method !== 'GET');
+}
+
+async function handleRequest(req, res) {
+  const reqPath = req.url.split('?')[0];
+  const onAdminPort = ADMIN_ENABLED && req.socket.localPort === ADMIN_PORT;
+  if (ADMIN_ENABLED && !onAdminPort && isAdminPath(reqPath, req.method)) {
+    send(res, 404, { error: 'not found' });
+    return;
+  }
+
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
     res.end();
@@ -1013,7 +1034,9 @@ const server = http.createServer(async (req, res) => {
   }
 
   send(res, 404, { error: 'not found' });
-});
+}
+
+const server = http.createServer(handleRequest);
 
 server.listen(PORT, () => {
   const cfg = loadConfig();
@@ -1023,7 +1046,9 @@ server.listen(PORT, () => {
   console.log('  中通冷链 AI 智能助理 · 百炼代理已启动');
   console.log('  ─────────────────────────────────────────');
   console.log('  气泡地址 : http://localhost:' + PORT + '/');
-  console.log('  管理后台 : http://localhost:' + PORT + '/admin');
+  console.log('  管理后台 : ' + (ADMIN_ENABLED
+    ? 'http://' + (ADMIN_BIND === '0.0.0.0' ? 'localhost' : ADMIN_BIND) + ':' + ADMIN_PORT + '/admin（公共端口已屏蔽）'
+    : 'http://localhost:' + PORT + '/admin'));
   console.log('  嵌入脚本 : http://localhost:' + PORT + '/embed.js');
   console.log('  接入模式 : ' + mode);
   console.log('  Key 状态 : ' + (cfg.apiKey ? '已配置' : '未配置'));
@@ -1038,3 +1063,9 @@ server.listen(PORT, () => {
   console.log('  对话限流 : ' + (RATE_LIMIT > 0 ? '每 IP ' + RATE_LIMIT + ' 次/分钟' : '未启用'));
   console.log('');
 });
+
+if (ADMIN_ENABLED) {
+  http.createServer(handleRequest).listen(ADMIN_PORT, ADMIN_BIND, () => {
+    console.log('  管理监听 : http://' + ADMIN_BIND + ':' + ADMIN_PORT + '（公共端口已屏蔽后台路径）');
+  });
+}
