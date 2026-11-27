@@ -41,7 +41,7 @@ pnpm start          # 启动代理，默认端口 8787（PORT 环境变量可覆
 - 一台 Linux 服务器（Ubuntu 22.04/24.04，2 核 4G 起），能 SSH 登录
 - 安全组/防火墙放行 `22`、`8787`；`8788` 只对內网开放，**不要对公网放行**
 - 百炼 `apiKey`，以及智能体应用 `appId`（或模型名 `model`）
-- 钉钉应用凭据（可选；纯 HTTP 部署先不要启用钉钉登录，见第 7 步）
+- 钉钉应用凭据（可选；分端口部署不要启用钉钉登录，后台用 `ADMIN_TOKEN`，见第 7 步）
 
 下面命令默认以 `root` 执行；用普通用户时自行加 `sudo`。先设部署目录：
 
@@ -292,7 +292,7 @@ docker compose up -d
 | `docker compose up` 拉镜像超时 | 默认已用 DaoCloud 国内镜像；仍失败时在 `.env` 改 `NODE_IMAGE`，或配 Docker 镜像加速 |
 | app 起不来，日志 `EACCES /data` | `chown -R 1000:1000 data` 后 `docker compose restart app` |
 | `/api/ping` 的 `configured` 为 false | `data/config.json` 没填 `apiKey` 或没填 `appId`/`model`；改完 `docker compose restart app` |
-| 后台没让输令牌就进去了 | `.env` 里 `ADMIN_TOKEN` 为空且没配钉钉。补上后 `docker compose up -d` |
+| 后台没让输令牌就进去了 | 只发生在单端口模式且 `ADMIN_TOKEN` 为空、未配钉钉。分端口模式未设令牌会直接拒绝启动 |
 | HTTPS 页面里气泡/脚本被浏览器拦截 | 混合内容限制，给本服务加 HTTPS 反代（下一节） |
 | 钉钉报 redirect_uri 错误 | 钉钉登录必须 HTTPS；`PUBLIC_ORIGIN`、回调地址、域名三者一致 |
 | 钉钉报 `60020` | 钉钉后台「服务器出口 IP」没加宿主机公网 IP |
@@ -367,7 +367,7 @@ docker compose up -d           # 再启动
 
 - **PC 浏览器**：后台展示「使用钉钉登录」→ 跳转钉钉扫码 → 回调 `GET /api/auth/dingtalk/callback` 换取用户信息 → 写入会话（`sessions.json`，7 天有效，重启不掉登录）
 - **钉钉客户端内**：自动加载钉钉 JSAPI 免登（`POST /api/auth/dingtalk/auto`），无需扫码
-- 鉴权优先级：`X-Admin-Token` 请求头与登录会话任一通过即可；**配置了钉钉凭据后后台强制登录**，两者都未配置时维持旧的本地开放行为
+- 鉴权优先级：`X-Admin-Token` 请求头与登录会话任一通过即可；**配置了钉钉凭据后后台强制登录**。单端口模式下两者都未配置时维持旧的本地开放行为；**分端口模式启动时强制要求 `ADMIN_TOKEN`**
 - 退出登录：后台侧栏底部「退出」，调 `POST /api/auth/logout`
 
 **上线前必须在钉钉开放平台登记回调地址**（应用开发 → 登录与分享 → 授权回调地址）：
@@ -380,14 +380,19 @@ https://你的域名/api/auth/dingtalk/callback
 
 **同时检查应用的服务器出口 IP 白名单**（应用开发 → 安全设置 → 服务器出口IP）：钉钉企业内部应用的 topapi（免登、unionId 换姓名）有 IP 白名单限制，部署服务器的公网出口 IP 必须加入，否则报 `60020 访问ip不在白名单之中`。
 
-其余运行时配置（值班表、人员、FAQ、机器人形象等）存于 `bailian-proxy/sidebar.json`，全部通过管理后台维护，无需手工编辑。
+其余运行时配置（值班表、人员、FAQ、机器人形象等）存于 `sidebar.json`，全部通过管理后台维护，无需手工编辑：Docker 部署实际文件是 `data/sidebar.json`（容器内 `/data/sidebar.json`），旧部署在 `bailian-proxy/sidebar.json`。
 
 ### 环境变量
 
 | 变量 | 默认 | 说明 |
 | --- | --- | --- |
-| `PORT` | `8787` | 服务端口 |
-| `ADMIN_TOKEN` | 空 | 管理后台令牌；生产/内网共享环境务必设置 |
+| `PORT` | `8787` | 公共端口：气泡、对话、嵌入脚本 |
+| `ADMIN_PORT` | 空 | 管理端口；设置后公共端口屏蔽后台页面与后台接口，且必须配 `ADMIN_TOKEN` |
+| `ADMIN_BIND` | `127.0.0.1` | 管理端口监听地址；compose 内固定 `0.0.0.0`，由宿主 `ADMIN_HOST_BIND` 控制暴露范围 |
+| `ADMIN_TOKEN` | 空 | 管理后台令牌；分端口部署必填，未设置会拒绝启动 |
+| `DATA_DIR` | `server.js` 所在目录 | 运行时数据目录（config/sidebar/sessions/uploads）；Docker 固定 `/data` |
+| `PUBLIC_ORIGIN` | 空 | 钉钉回调使用的固定地址，如 `https://ai.example.com` |
+| `DINGTALK_APP_KEY` / `DINGTALK_APP_SECRET` / `DINGTALK_CORP_ID` | 空 | 钉钉凭据；`config.json` 对应字段非空时以 `config.json` 为准 |
 | `CHAT_RATE_LIMIT` | `30` | 对话接口每 IP 每分钟请求上限，`0` 关闭 |
 | `SSE_MAX_CONCURRENT` | `50` | 全局 SSE 流并发上限，超出返回 429「咨询人数较多」；2核4G 机器可调到 50~100 |
 
