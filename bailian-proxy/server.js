@@ -269,7 +269,10 @@ function requireAdmin(req, res) {
 function send(res, status, obj) {
   const body = JSON.stringify(obj);
   // 不下发跨域头：聊天组件经 iframe 加载、与代理同源；跨域直接调 API 会烧百炼配额，明确不允许
-  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+  res.writeHead(status, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'X-Content-Type-Options': 'nosniff'
+  });
   res.end(body);
 }
 
@@ -425,10 +428,10 @@ async function callAppStream(cfg, prompt, sessionId, res) {
   for await (const chunk of resp.body) {
     if (clientGone) break;
     buffer += decoder.decode(chunk, { stream: true });
-    let end;
-    while ((end = buffer.indexOf('\n\n')) !== -1) {
-      const block = buffer.slice(0, end);
-      buffer = buffer.slice(end + 2);
+    let m;
+    while ((m = buffer.match(/\r?\n\r?\n/)) !== null) {
+      const block = buffer.slice(0, m.index);
+      buffer = buffer.slice(m.index + m[0].length);
       handleBlock(parseSseBlock(block), block);
     }
   }
@@ -527,10 +530,10 @@ async function callModelStream(cfg, messages, res) {
   for await (const chunk of resp.body) {
     if (clientGone) break;
     buffer += decoder.decode(chunk, { stream: true });
-    let end;
-    while ((end = buffer.indexOf('\n\n')) !== -1) {
-      const block = buffer.slice(0, end);
-      buffer = buffer.slice(end + 2);
+    let m;
+    while ((m = buffer.match(/\r?\n\r?\n/)) !== null) {
+      const block = buffer.slice(0, m.index);
+      buffer = buffer.slice(m.index + m[0].length);
       handleBlock(block);
     }
   }
@@ -585,14 +588,31 @@ function tooManyRequests(req) {
 // 按主机名/IP 字面量判断；域名解析到内网 IP 的绕过手法防不住，严格场景应在反向代理层再做限制
 function isBlockedHost(hostname) {
   const host = String(hostname || '').toLowerCase().replace(/^\[|\]$/g, '');
+  if (host.startsWith('::ffff:')) {
+    const v4 = host.slice(7);
+    return /^\d{1,3}(\.\d{1,3}){3}$/.test(v4) ? isBlockedHost(v4) : true;
+  }
   if (host === 'localhost' || host.endsWith('.local') || host.endsWith('.internal')) return true;
   const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
   if (ipv4) {
     const a = Number(ipv4[1]);
     const b = Number(ipv4[2]);
-    if (a === 0 || a === 10 || a === 127 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)) return true;
+    const c = Number(ipv4[3]);
+    if (
+      a === 0 || a === 10 || a === 127 ||
+      (a === 100 && b >= 64 && b <= 127) ||   // 运营商 NAT / 云厂商 metadata（100.100.100.200）
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      (a === 192 && b === 0 && c === 0) ||    // IETF 保留
+      (a === 198 && (b === 18 || b === 19)) ||
+      (a === 198 && b === 51 && c === 100) ||
+      (a === 203 && b === 0 && c === 113) ||
+      a >= 224                                // 组播/保留
+    ) return true;
   }
-  if (host === '::1' || host.startsWith('fc') || host.startsWith('fd') || host.startsWith('fe80')) return true;
+  if (host === '::' || host === '::1') return true;
+  if (/^f[cd]/.test(host) || /^fe[89ab]/.test(host)) return true; // IPv6 ULA / link-local
   return false;
 }
 
@@ -603,7 +623,8 @@ function serveFile(res, filePath) {
     const ext = path.extname(filePath).toLowerCase();
     const headers = {
       'Content-Type': MIME[ext] || 'application/octet-stream',
-      'Cache-Control': 'no-cache'
+      'Cache-Control': 'no-cache',
+      'X-Content-Type-Options': 'nosniff'
     };
     // 防盗链：配置了嵌入白名单后，页面仅允许本站与白名单站点 iframe 展示（悬浮与 iframe 嵌入最终都走 iframe，一并覆盖）
     if (ext === '.html') {
@@ -688,7 +709,7 @@ async function handleRequest(req, res) {
     const cfg = loadConfig();
     if (!dingtalkReady(cfg)) { send(res, 400, { success: false, error: '未配置钉钉登录（dingtalkAppKey / dingtalkAppSecret）' }); return; }
     const redirect = new URL(req.url, 'http://localhost').searchParams.get('redirect') || '/admin';
-    if (!redirect.startsWith('/')) { send(res, 400, { success: false, error: 'redirect 必须是站内路径' }); return; }
+    if (!redirect.startsWith('/') || redirect.startsWith('//')) { send(res, 400, { success: false, error: 'redirect 必须是站内路径' }); return; }
     const state = crypto.randomBytes(16).toString('hex');
     loginStates.set(state, { redirect: redirect, expires: Date.now() + 5 * 60 * 1000 });
     setTimeout(() => loginStates.delete(state), 5 * 60 * 1000);
@@ -706,7 +727,7 @@ async function handleRequest(req, res) {
     const state = q.get('state') || '';
     const saved = loginStates.get(state);
     loginStates.delete(state);
-    const backTo = saved && saved.redirect.startsWith('/') && saved.redirect !== '/login' ? saved.redirect : '/admin';
+    const backTo = saved && saved.redirect.startsWith('/') && !saved.redirect.startsWith('//') && saved.redirect !== '/login' ? saved.redirect : '/admin';
     const fail = (msg) => {
       res.writeHead(302, { Location: '/login?redirect=' + encodeURIComponent(backTo) + '&error=' + encodeURIComponent(msg) });
       res.end();
@@ -807,7 +828,15 @@ async function handleRequest(req, res) {
   // ---------- 侧边栏配置中台 ----------
   if (req.method === 'GET' && req.url.split('?')[0] === '/api/sidebar') {
     const sb = loadSidebar();
-    send(res, 200, { success: true, config: sb, today: todayDuty(sb) });
+    // 公共端只下发气泡需要的字段；管理员才拿 isAdmin/userId
+    const config = isAdmin(req) ? sb : {
+      ...sb,
+      staff: (Array.isArray(sb.staff) ? sb.staff : []).map((item) => ({
+        name: item.name || '',
+        dingtalkId: item.dingtalkId || ''
+      }))
+    };
+    send(res, 200, { success: true, config: config, today: todayDuty(sb) });
     return;
   }
   if (req.method === 'POST' && req.url.split('?')[0] === '/api/sidebar') {
@@ -986,18 +1015,39 @@ async function handleRequest(req, res) {
     try { target = new URL(new URL(req.url, 'http://localhost').searchParams.get('url') || ''); }
     catch (e) { target = null; }
     if (!target || !/^https?:$/.test(target.protocol)) { send(res, 400, { error: 'url 参数缺失或非法' }); return; }
-    const port = target.port ? Number(target.port) : (target.protocol === 'https:' ? 443 : 80);
-    if (port !== 80 && port !== 443) { send(res, 403, { error: '仅允许代理 80/443 端口的图片' }); return; }
-    if (isBlockedHost(target.hostname)) { send(res, 403, { error: '不允许代理内网或本机地址' }); return; }
+    const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
     try {
-      const r = await fetch(target, { redirect: 'follow', headers: { 'User-Agent': 'Mozilla/5.0 bailian-proxy' } });
+      let current = target;
+      let r = null;
+      // 手动跟随重定向：每一跳都重新校验，避免 302 到内网绕过黑名单
+      for (let hop = 0; hop <= 3; hop++) {
+        const port = current.port ? Number(current.port) : (current.protocol === 'https:' ? 443 : 80);
+        if (!/^https?:$/.test(current.protocol) || (port !== 80 && port !== 443)) {
+          send(res, 403, { error: '仅允许代理 80/443 端口的 HTTP(S) 图片' });
+          return;
+        }
+        if (isBlockedHost(current.hostname)) {
+          send(res, 403, { error: '不允许代理内网或本机地址' });
+          return;
+        }
+        r = await fetch(current, { redirect: 'manual', headers: { 'User-Agent': 'Mozilla/5.0 bailian-proxy' } });
+        const location = r.headers.get('location');
+        if (!location || ![301, 302, 303, 307, 308].includes(r.status)) break;
+        current = new URL(location, current);
+      }
+      if (r.status >= 300 && r.status < 400) { send(res, 502, { error: '重定向次数过多' }); return; }
       if (!r.ok) { send(res, 502, { error: '源站返回 ' + r.status }); return; }
-      const ct = r.headers.get('content-type') || 'application/octet-stream';
+      const ct = r.headers.get('content-type') || '';
+      if (!/^image\//i.test(ct)) { send(res, 502, { error: '源站返回的不是图片' }); return; }
+      const declared = Number(r.headers.get('content-length') || 0);
+      if (declared > MAX_IMAGE_BYTES) { send(res, 413, { error: '图片过大' }); return; }
       const buf = Buffer.from(await r.arrayBuffer());
+      if (buf.length > MAX_IMAGE_BYTES) { send(res, 413, { error: '图片过大' }); return; }
       res.writeHead(200, {
         'Content-Type': ct,
         'Content-Length': buf.length,
         'Cache-Control': 'public, max-age=3600',
+        'X-Content-Type-Options': 'nosniff',
         'X-Img-Proxy': 'bailian'
       });
       res.end(buf);
@@ -1037,6 +1087,14 @@ async function handleRequest(req, res) {
 }
 
 const server = http.createServer(handleRequest);
+
+if (ADMIN_ENABLED && !ADMIN_TOKEN) {
+  console.error('');
+  console.error('  [启动失败] 已开启管理端口（ADMIN_PORT），但未设置 ADMIN_TOKEN。');
+  console.error('  分端口模式下管理端口不接受钉钉登录，请先在 .env 设置 ADMIN_TOKEN 再启动。');
+  console.error('');
+  process.exit(1);
+}
 
 server.listen(PORT, () => {
   const cfg = loadConfig();

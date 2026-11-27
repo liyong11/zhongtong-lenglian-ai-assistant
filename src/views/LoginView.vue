@@ -3,7 +3,7 @@ import { onMounted, ref } from 'vue'
 
 // 独立登录页：管理后台未登录时跳转到这里（对标 houpe-auth 的 /auth/login）
 const query = new URLSearchParams(location.search)
-const redirect = (query.get('redirect') || '/admin').startsWith('/') && query.get('redirect') !== '/login' ? query.get('redirect') : '/admin'
+const redirect = (query.get('redirect') || '/admin').startsWith('/') && !(query.get('redirect') || '').startsWith('//') && query.get('redirect') !== '/login' ? query.get('redirect') : '/admin'
 const error = ref(query.get('error') || '')
 const busy = ref(false)
 const checking = ref(true)

@@ -84,13 +84,13 @@ vi .env
 APP_PORT=8787            # 公共端口：气泡、对话、嵌入脚本
 APP_BIND=0.0.0.0         # 公共端口直接对外；只让本机反代时改 127.0.0.1
 ADMIN_PORT=8788          # 管理端口：只服务 /admin
-ADMIN_HOST_BIND=0.0.0.0  # 管理端口绑定：仅本机用 127.0.0.1；内网填内网网卡 IP 或 0.0.0.0
+ADMIN_HOST_BIND=127.0.0.1 # 默认仅本机（SSH 隧道访问）；内网直连改内网网卡 IP 或 0.0.0.0
 ADMIN_TOKEN=换成一串随机字符
 ```
 
 - 公共端口访问 `/admin`、`/api/admin/*`、`/api/auth/*` 会直接 404，只有 `8788` 能进后台。
-- `ADMIN_HOST_BIND` 控制宿主机把管理端口开到哪：`127.0.0.1` 仅本机（可 SSH 隧道访问），内网访问填内网网卡 IP 或 `0.0.0.0` 并配合安全组。
-- `ADMIN_TOKEN` 是 `/admin` 的后台口令，自己编，不是系统生成；`openssl rand -hex 24` 可生成。分端口模式下建议必须设。
+- `ADMIN_HOST_BIND` 控制宿主机把管理端口开到哪：`127.0.0.1` 仅本机，内网访问填内网网卡 IP 或 `0.0.0.0` 并配合安全组。
+- `ADMIN_TOKEN` 是 `/admin` 的后台口令，自己编，不是系统生成；`openssl rand -hex 24` 可生成。**分端口模式下必填，未设置会拒绝启动**。
 - 钉钉凭据也在 `.env` 里填（`DINGTALK_APP_KEY` / `DINGTALK_APP_SECRET` / `DINGTALK_CORP_ID`），见第 7 步。
 - HTTP 下令牌是明文传输，内网可以接受；公网管理不建议。
 
@@ -270,12 +270,12 @@ tar czf "backup-$(date +%F-%H%M).tgz" data .env
 
 恢复到新机器：装 Docker → 拉代码 → 解开备份到 `$APP_DIR` → `chown -R 1000:1000 data` → `docker compose up -d --build`。
 
-从旧服务器迁移，只拷三样到 `data/`：
+从旧服务器迁移，只拷三样到 `data/`（路径按旧部署实际目录替换，早期 A 服务器是 `/opt/aitalk/bailian-proxy`）：
 
 ```bash
-scp root@旧服务器:/opt/aitalk/bailian-proxy/config.json  data/
-scp root@旧服务器:/opt/aitalk/bailian-proxy/sidebar.json data/
-scp -r root@旧服务器:/opt/aitalk/bailian-proxy/uploads   data/
+scp root@旧服务器:<旧部署目录>/bailian-proxy/config.json  data/
+scp root@旧服务器:<旧部署目录>/bailian-proxy/sidebar.json data/
+scp -r root@旧服务器:<旧部署目录>/bailian-proxy/uploads   data/
 chown -R 1000:1000 data
 docker compose up -d
 ```
@@ -395,7 +395,7 @@ https://你的域名/api/auth/dingtalk/callback
 
 - API Key 只存服务端，管理接口对 Key 只写不读
 - 对话接口按 IP 限流，且不再下发跨域响应头（组件经 iframe 与代理同源，正常使用不受影响）
-- 图片代理 `/api/imgproxy` 拒绝内网/本机地址与 80/443 以外端口；按主机名判断，防不住域名解析到内网 IP 的绕过，严格场景请在反向代理层加固
+- 图片代理 `/api/imgproxy` 拒绝内网/本机/云 metadata 地址（含 `100.64.0.0/10`），手动校验每一跳重定向，只接受 `image/*` 且限制 8MB；按主机名判断，防不住恶意域名解析到内网 IP 的绕过，严格场景请在反向代理层封掉该接口
 - 配置写入为原子写（临时文件 + rename），损坏时自动备份为 `*.corrupt-时间戳` 并按空配置运行
 
 ## 运维注意事项

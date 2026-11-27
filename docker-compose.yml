@@ -27,3 +27,8 @@ services:
       - "${ADMIN_HOST_BIND:-127.0.0.1}:${ADMIN_PORT:-8788}:${ADMIN_PORT:-8788}"
     volumes:
       - ./data:/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
