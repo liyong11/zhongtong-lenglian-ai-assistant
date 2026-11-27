@@ -1,6 +1,0 @@
-{$DOMAIN} {
-	# SSE 流式对话必须立即 flush，否则气泡不会逐字输出
-	reverse_proxy app:8787 {
-		flush_interval -1
-	}
-}

@@ -24,27 +24,27 @@ pnpm start          # 启动代理，默认端口 8787（PORT 环境变量可覆
 
 开发模式：`pnpm dev`（Vite 5173，`/api` 自动代理到 8787，需同时跑 `pnpm dev:server`）。
 
-## 部署（Docker，推荐）
+## 部署（Docker）
 
-整站两个容器：`app`（Node 代理 + 前端产物）和 `caddy`（自动申请 HTTPS、反代 SSE）。服务器**不需要装 Node、pnpm、nginx**，只要 Docker；代码在服务器上构建成镜像。
+单容器部署：Node 进程直接对外监听 `8787`，不依赖域名、DNS 和证书。前端构建在镜像里完成，服务器只要 Docker。
 
 ```
-公网 80/443 → caddy 容器 → app:8787 → /data（配置、会话、上传文件）
+访问者 → app 容器 :8787 → /data（配置、会话、上传文件）
 ```
+
+> 以后要挂到 HTTPS 域名后面，见文末「可选：放到 HTTPS 后面」。
 
 ### 0. 准备清单
 
-- 一台 Linux 服务器（Ubuntu 22.04/24.04，2 核 4G 起），能 SSH 登录，有公网 IP
-- 一个域名，能改 DNS 的 A 记录
+- 一台 Linux 服务器（Ubuntu 22.04/24.04，2 核 4G 起），能 SSH 登录
+- 安全组/防火墙放行 `22` 和 `8787`（最好只放行公司网段）
 - 百炼 `apiKey`，以及智能体应用 `appId`（或模型名 `model`）
-- 钉钉企业内部应用的 `AppKey` / `AppSecret` / `CorpId`（不用钉钉登录可不填）
-- 服务器安全组放行 `22`、`80`、`443`；**不要放行 8787**
+- 钉钉应用凭据（可选；纯 HTTP 部署先不要启用钉钉登录，见第 7 步）
 
-下面命令默认以 `root` 执行；用普通用户时自行加 `sudo`。先设两个变量，后面直接复制：
+下面命令默认以 `root` 执行；用普通用户时自行加 `sudo`。先设部署目录：
 
 ```bash
-export DOMAIN=ai.example.com          # 换成你的域名
-export APP_DIR=/opt/ai-assistant      # 部署目录
+export APP_DIR=/opt/ai-assistant
 ```
 
 ### 1. 安装 Docker
@@ -69,21 +69,24 @@ cd "$APP_DIR"
 
 目录已存在时改成 `cd "$APP_DIR" && git pull`。
 
-### 3. 配置域名和密钥
+### 3. 配置端口和后台口令
 
 ```bash
 cp .env.example .env
 vi .env
 ```
 
-`.env` 最少改两项：
+最少确认这两项：
 
 ```dotenv
-DOMAIN=ai.example.com          # 必须是域名，不带 https:// 和结尾斜杠
-ADMIN_TOKEN=换成一串随机字符     # openssl rand -hex 24 可生成
+APP_PORT=8787          # 对外端口，被占用就换一个
+APP_BIND=0.0.0.0       # 直接对外；只让本机反代时改 127.0.0.1
+ADMIN_TOKEN=换成一串随机字符
 ```
 
-`ADMIN_TOKEN` 是没启用钉钉登录时的后台口令，必须设，否则后台对公网开放。其余项保持默认。
+- `ADMIN_TOKEN` 是 `/admin` 的后台口令，自己编，不是系统生成；`openssl rand -hex 24` 可生成。
+- 服务器只有你能访问（纯内网）时可留空；只要别人也能打开这个地址，就必须设，否则后台对所有人开放。
+- HTTP 下令牌是明文传输，公网环境建议放到 HTTPS 反代后面再用。
 
 ```bash
 chmod 600 .env
@@ -116,7 +119,7 @@ vi data/config.json
 ```
 
 - `appId` 与 `model` 二选一：用百炼智能体应用就填 `appId`、`model` 留空；直调模型就 `appId` 留空、`model` 填如 `qwen-plus`。
-- 用钉钉登录时填 `dingtalkAppKey` / `dingtalkAppSecret` / `dingtalkCorpId`，`ADMIN_TOKEN` 可留空。
+- 纯 HTTP 部署时钉钉字段留空，后台用 `ADMIN_TOKEN` 登录。
 - 检查 JSON 合法性：`python3 -m json.tool data/config.json >/dev/null && echo OK`。
 
 关键一步：容器内进程 uid 是 `1000`，数据目录必须让它可写：
@@ -124,12 +127,6 @@ vi data/config.json
 ```bash
 chown -R 1000:1000 data
 chmod 600 data/config.json
-```
-
-DNS 也要先指过来（Caddy 启动时就要签证书）：
-
-```bash
-dig +short "$DOMAIN"       # 输出应为服务器公网 IP；没有就等 DNS 生效
 ```
 
 ### 5. 启动
@@ -141,60 +138,66 @@ docker compose up -d --build
 首次要构建前端镜像，约 2~5 分钟。看状态和日志：
 
 ```bash
-docker compose ps                    # app 应为 healthy，caddy 为 running
+docker compose ps                    # app 应为 healthy
 docker compose logs -f app           # Ctrl+C 退出日志
-docker compose logs --tail 50 caddy  # 证书申请进度
 ```
-
-容器时区已固定为 `Asia/Shanghai`，值班日期不会因为服务器时区跑偏。
 
 改 `.env` 或 `docker-compose.yml` 后要让容器重建才生效：`docker compose up -d`。
 
+容器时区已固定为 `Asia/Shanghai`，值班日期不会因为服务器时区跑偏。
+
 ### 6. 验证
 
+服务器本机：
+
 ```bash
-curl -fsS "https://$DOMAIN/api/ping"
+curl -fsS http://127.0.0.1:8787/api/ping
 # 期望：{"success":true,"mode":"app","configured":true,...}
 ```
 
 `configured` 为 `false` 说明 `data/config.json` 的 `apiKey`、`appId`/`model` 没填对。
 
 ```bash
-curl -fsS "https://$DOMAIN/embed.js" | head -3     # 应输出嵌入脚本
-curl -fsSI "https://$DOMAIN/" | head -1            # 应返回 200
+curl -fsS http://127.0.0.1:8787/embed.js | head -3   # 应输出嵌入脚本
+curl -fsSI http://127.0.0.1:8787/ | head -1          # 应返回 200
 ```
+
+浏览器打开（换成服务器 IP）：
+
+- 气泡：`http://<服务器IP>:8787/`
+- 后台：`http://<服务器IP>:8787/admin`
 
 再实测一次流式：
 
 ```bash
-curl -N -X POST "https://$DOMAIN/api/chat/stream" \
+curl -N -X POST http://127.0.0.1:8787/api/chat/stream \
   -H 'Content-Type: application/json' \
   -d '{"prompt":"你好"}'
 ```
 
-应先出现 `event: ready`，随后陆续输出 `data:` 片段；一次性全出说明 Caddy 的 `flush_interval -1` 没生效（检查 `Caddyfile` 是否挂载）。
+应先出现 `event: ready`，随后陆续输出 `data:` 片段。
 
 ### 7. 钉钉登录（可选）
 
-不启用就跳过，用 `ADMIN_TOKEN` 进后台。
+钉钉扫码回调要求公网 HTTPS，**纯 HTTP/IP 部署不要启用**，用 `ADMIN_TOKEN` 即可。已经有 HTTPS 域名时：
 
 1. 钉钉开放平台创建企业内部应用，记下 `AppKey`、`AppSecret`、企业 `CorpId`，填进 `data/config.json` 或后台。
-2. 「登录与分享」→ 授权回调地址填：`https://$DOMAIN/api/auth/dingtalk/callback`
+2. 「登录与分享」→ 授权回调地址填：`https://你的域名/api/auth/dingtalk/callback`
 3. 「安全设置」→ 服务器出口 IP：填服务器公网出口 IP，容器走宿主机 NAT，所以填宿主机的：
    ```bash
    curl -s ifconfig.me
    ```
    不填会报 `60020 访问ip不在白名单之中`。
 4. 开通通讯录读取相关权限并发布应用版本，否则扫码后拿不到用户信息。
-5. 改完配置重启：`docker compose restart app`。
+5. `.env` 里设置 `PUBLIC_ORIGIN=https://你的域名`，再 `docker compose up -d`。
 
-回调地址由 `PUBLIC_ORIGIN` 固定（compose 里已按 `https://$DOMAIN` 注入），必须和开放平台登记的一字不差。
+回调地址由 `PUBLIC_ORIGIN` 固定，必须和开放平台登记的一字不差。
 
 ### 8. 后台初始化
 
-打开 `https://$DOMAIN/admin`：
+打开 `http://<服务器IP>:8787/admin`：
 
-- 配了钉钉凭据：扫码登录；否则输入 `.env` 里的 `ADMIN_TOKEN`。
+- 没配钉钉时输入 `.env` 里的 `ADMIN_TOKEN`。
 - 第一次登录后立刻到「人员设置」勾选管理员并保存（一个管理员都没勾选时全员可登录，属首次引导逻辑）。
 - 依次配置：机器人形象（名称/头像）、值班表、下载汇总、常见问题、人员。
 - 需要限制嵌入站点时填「允许嵌入域名」；需要口令时设「嵌入口令」。
@@ -206,15 +209,17 @@ curl -N -X POST "https://$DOMAIN/api/chat/stream" \
 在对方页面 `</body>` 前：
 
 ```html
-<script src="https://ai.example.com/embed.js" data-title="小冷"></script>
+<script src="http://<服务器IP>:8787/embed.js" data-title="小冷"></script>
 ```
 
 设了嵌入口令则用 `.../embed.js?token=口令`。对方站点有 CSP 时放行：
 
 ```text
-script-src https://ai.example.com
-frame-src https://ai.example.com
+script-src http://<服务器IP>:8787
+frame-src http://<服务器IP>:8787
 ```
+
+⚠️ **对方页面是 HTTPS 时，浏览器会拦截 HTTP 的脚本和 iframe（混合内容）**。这种场景必须给本服务套一层 HTTPS 反代，见下一节。
 
 ### 10. 日常更新与回滚
 
@@ -227,7 +232,7 @@ tar czf "backup-$(date +%F-%H%M).tgz" data .env
 git pull
 docker compose up -d --build
 docker compose ps
-curl -fsS "https://$(grep '^DOMAIN=' .env | cut -d= -f2)/api/ping"
+curl -fsS http://127.0.0.1:8787/api/ping
 ```
 
 回滚到上一个提交：
@@ -261,23 +266,21 @@ chown -R 1000:1000 data
 docker compose up -d
 ```
 
-然后更新钉钉回调地址、出口 IP、DNS。
-
 ### 12. 故障排查
 
 | 现象 | 原因与处理 |
 | --- | --- |
-| `docker compose up` 拉镜像超时 | 默认已用 DaoCloud 国内镜像；仍失败时在 `.env` 改 `NODE_IMAGE` / `CADDY_IMAGE`，或配 Docker 镜像加速 |
-| Caddy 日志报签证书失败 | DNS 没指向本机、80/443 没放行、或域名走了 Cloudflare 橙云代理。先 `dig +short $DOMAIN`；橙云改灰云或改用 DNS 验证 |
-| 访问 502 | `docker compose ps` 看 app 是否 healthy，`docker compose logs --tail 100 app` |
+| 浏览器打不开 `IP:8787` | 安全组/防火墙没放行 8787；`ss -lntp \| grep 8787` 看端口；`docker compose ps` 看容器 |
+| `docker compose up` 拉镜像超时 | 默认已用 DaoCloud 国内镜像；仍失败时在 `.env` 改 `NODE_IMAGE`，或配 Docker 镜像加速 |
 | app 起不来，日志 `EACCES /data` | `chown -R 1000:1000 data` 后 `docker compose restart app` |
 | `/api/ping` 的 `configured` 为 false | `data/config.json` 没填 `apiKey` 或没填 `appId`/`model`；改完 `docker compose restart app` |
-| 扫码报 redirect_uri 错误 | `.env` 的 `DOMAIN`、`PUBLIC_ORIGIN`、钉钉登记的回调地址三者不一致 |
+| 后台没让输令牌就进去了 | `.env` 里 `ADMIN_TOKEN` 为空且没配钉钉。补上后 `docker compose up -d` |
+| HTTPS 页面里气泡/脚本被浏览器拦截 | 混合内容限制，给本服务加 HTTPS 反代（下一节） |
+| 钉钉报 redirect_uri 错误 | 钉钉登录必须 HTTPS；`PUBLIC_ORIGIN`、回调地址、域名三者一致 |
 | 钉钉报 `60020` | 钉钉后台「服务器出口 IP」没加宿主机公网 IP |
-| 回答不逐字输出 | `Caddyfile` 没挂载或少了 `flush_interval -1`；`docker compose restart caddy` |
-| 后台登录后又跳登录页 | 必须用 HTTPS；检查 `data/` 写权限和浏览器是否禁 Cookie |
+| 回答不逐字输出 | 直连容器一般不会；如果前面加了 nginx，确认 SSE location 关闭了 `proxy_buffering` |
 | 上传头像失败 | `data/uploads` 权限不对，`chown -R 1000:1000 data` |
-| 80/443 被占用 | 宿主机已有 nginx/宝塔：停掉它，或改 Caddy 端口（改完域名访问要带端口，不推荐） |
+| 8787 被占用 | `.env` 里改 `APP_PORT`，例如 `APP_PORT=8790`，再 `docker compose up -d` |
 | 配置改坏了 | 服务器会留 `data/config.json.corrupt-时间戳`；从备份恢复或重填 |
 
 常用命令：
@@ -285,13 +288,41 @@ docker compose up -d
 ```bash
 docker compose ps
 docker compose logs -f app
-docker compose logs -f caddy
 docker compose restart app
 docker compose down            # 停止（data 不受影响）
 docker compose up -d           # 再启动
 ```
 
-### 13. 不想用 Docker
+### 13. 可选：放到 HTTPS 后面
+
+公司已有 nginx/网关时：
+
+1. `.env` 改 `APP_BIND=127.0.0.1`（8787 不再对外），设 `PUBLIC_ORIGIN=https://你的域名`，`docker compose up -d`。
+2. 反向代理到 `http://127.0.0.1:8787`，SSE 路径 `/api/chat/stream` 要关缓冲：
+
+   ```nginx
+   location = /api/chat/stream {
+       proxy_pass http://127.0.0.1:8787;
+       proxy_http_version 1.1;
+       proxy_set_header Host $host;
+       proxy_set_header X-Forwarded-Host $host;
+       proxy_set_header X-Forwarded-Proto $scheme;
+       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+       proxy_buffering off;
+       proxy_cache off;
+       proxy_read_timeout 300s;
+   }
+   location / {
+       proxy_pass http://127.0.0.1:8787;
+       proxy_set_header Host $host;
+       proxy_set_header X-Forwarded-Host $host;
+       proxy_set_header X-Forwarded-Proto $scheme;
+   }
+   ```
+
+3. 钉钉回调、嵌入地址都改用 HTTPS 域名。
+
+### 14. 不想用 Docker
 
 按 git 历史里的 systemd + nginx 方案部署（`git show bb8860f:README.md`），需要服务器装 Node 20+、nginx、certbot。功能一致，步骤更多。
 
@@ -364,9 +395,8 @@ public/            embed.js 嵌入脚本
 docs/              EMBEDDING.md 嵌入说明、prototype/ 早期静态原型（仅存档）
 dist/              构建产物（git 忽略）
 Dockerfile         多阶段构建：Vite 打包 + Node 运行
-docker-compose.yml app + caddy 两个容器
-Caddyfile          自动 HTTPS 与 SSE 反代
-.env.example       域名、管理令牌、镜像源模板
+docker-compose.yml 单容器 app，对外 8787
+.env.example       端口、监听地址、管理令牌、镜像源模板
 data/              运行时数据（git 忽略，容器挂到 /data）
 ```
 
