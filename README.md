@@ -86,6 +86,7 @@ ADMIN_TOKEN=换成一串随机字符
 
 - `ADMIN_TOKEN` 是 `/admin` 的后台口令，自己编，不是系统生成；`openssl rand -hex 24` 可生成。
 - 服务器只有你能访问（纯内网）时可留空；只要别人也能打开这个地址，就必须设，否则后台对所有人开放。
+- 钉钉凭据也在 `.env` 里填（`DINGTALK_APP_KEY` / `DINGTALK_APP_SECRET` / `DINGTALK_CORP_ID`），见第 7 步。
 - HTTP 下令牌是明文传输，公网环境建议放到 HTTPS 反代后面再用。
 
 ```bash
@@ -119,7 +120,7 @@ vi data/config.json
 ```
 
 - `appId` 与 `model` 二选一：用百炼智能体应用就填 `appId`、`model` 留空；直调模型就 `appId` 留空、`model` 填如 `qwen-plus`。
-- 纯 HTTP 部署时钉钉字段留空，后台用 `ADMIN_TOKEN` 登录。
+- 钉钉凭据建议放 `.env`（见第 7 步）：`config.json` 里 `dingtalkAppKey` / `dingtalkAppSecret` / `dingtalkCorpId` 留空即可；填了则以 `config.json` 为准。
 - 检查 JSON 合法性：`python3 -m json.tool data/config.json >/dev/null && echo OK`。
 
 关键一步：容器内进程 uid 是 `1000`，数据目录必须让它可写：
@@ -181,7 +182,13 @@ curl -N -X POST http://127.0.0.1:8787/api/chat/stream \
 
 钉钉扫码回调要求公网 HTTPS，**纯 HTTP/IP 部署不要启用**，用 `ADMIN_TOKEN` 即可。已经有 HTTPS 域名时：
 
-1. 钉钉开放平台创建企业内部应用，记下 `AppKey`、`AppSecret`、企业 `CorpId`，填进 `data/config.json` 或后台。
+1. 钉钉开放平台创建企业内部应用，记下 `AppKey`、`AppSecret`、企业 `CorpId`，填进 `.env`：
+   ```dotenv
+   DINGTALK_APP_KEY=dingxxxx
+   DINGTALK_APP_SECRET=xxxx
+   DINGTALK_CORP_ID=dingxxxx
+   ```
+   （`config.json` 里对应字段留空即可；两边都填时以 `config.json` 为准。）
 2. 「登录与分享」→ 授权回调地址填：`https://你的域名/api/auth/dingtalk/callback`
 3. 「安全设置」→ 服务器出口 IP：填服务器公网出口 IP，容器走宿主机 NAT，所以填宿主机的：
    ```bash
@@ -189,7 +196,7 @@ curl -N -X POST http://127.0.0.1:8787/api/chat/stream \
    ```
    不填会报 `60020 访问ip不在白名单之中`。
 4. 开通通讯录读取相关权限并发布应用版本，否则扫码后拿不到用户信息。
-5. `.env` 里设置 `PUBLIC_ORIGIN=https://你的域名`，再 `docker compose up -d`。
+5. `.env` 里设置 `PUBLIC_ORIGIN=https://你的域名`，再 `docker compose up -d` 让环境变量生效。
 
 回调地址由 `PUBLIC_ORIGIN` 固定，必须和开放平台登记的一字不差。
 
@@ -342,7 +349,7 @@ docker compose up -d           # 再启动
 | `allowedDomains` | 允许 iframe 嵌入本组件的站点域名（空格分隔）；留空不限制，由 CSP `frame-ancestors` 生效 |
 | `embedToken` | 嵌入口令；设置后 `/embed.js` 必须带 `?token=` 才下发 |
 
-也可用环境变量 `DINGTALK_APP_KEY` / `DINGTALK_APP_SECRET` / `DINGTALK_CORP_ID` 覆盖钉钉配置。
+也可用环境变量 `DINGTALK_APP_KEY` / `DINGTALK_APP_SECRET` / `DINGTALK_CORP_ID` 兜底：`config.json` 中对应字段为空时才生效。
 
 ### 管理后台钉钉登录
 
