@@ -112,15 +112,12 @@ vi data/config.json
   "appId": "你的智能体应用ID",
   "model": "",
   "systemPrompt": "你是中通冷链订单管理系统的智能助理「小冷」……",
-  "dingtalkAppKey": "",
-  "dingtalkAppSecret": "",
-  "dingtalkCorpId": "",
   "adminUsers": []
 }
 ```
 
 - `appId` 与 `model` 二选一：用百炼智能体应用就填 `appId`、`model` 留空；直调模型就 `appId` 留空、`model` 填如 `qwen-plus`。
-- 钉钉凭据建议放 `.env`（见第 7 步）：`config.json` 里 `dingtalkAppKey` / `dingtalkAppSecret` / `dingtalkCorpId` 留空即可；填了则以 `config.json` 为准。
+- 钉钉凭据不写进 `config.json`，全部放 `.env`（见第 7 步）。
 - 检查 JSON 合法性：`python3 -m json.tool data/config.json >/dev/null && echo OK`。
 
 关键一步：容器内进程 uid 是 `1000`，数据目录必须让它可写：
@@ -343,13 +340,11 @@ docker compose up -d           # 再启动
 | `appId` | 智能体应用 ID（推荐，支持云端多轮记忆与人设/知识库） |
 | `model` | 模型直调名称（如 `qwen-plus`），与 `appId` 二选一 |
 | `systemPrompt` | 模型直调模式的系统提示词 |
-| `dingtalkAppKey` / `dingtalkAppSecret` | 钉钉企业内部应用凭据；配置后管理后台强制钉钉登录（扫码 + 钉钉内免登） |
-| `dingtalkCorpId` | 企业 CorpId，用于钉钉客户端内自动免登 |
 | `adminUsers` | 钉钉 userId 白名单数组；留空表示企业内所有登录用户均可进后台 |
 | `allowedDomains` | 允许 iframe 嵌入本组件的站点域名（空格分隔）；留空不限制，由 CSP `frame-ancestors` 生效 |
 | `embedToken` | 嵌入口令；设置后 `/embed.js` 必须带 `?token=` 才下发 |
 
-也可用环境变量 `DINGTALK_APP_KEY` / `DINGTALK_APP_SECRET` / `DINGTALK_CORP_ID` 兜底：`config.json` 中对应字段为空时才生效。
+钉钉登录凭据不放在这里，用 `.env` 的 `DINGTALK_APP_KEY` / `DINGTALK_APP_SECRET` / `DINGTALK_CORP_ID`（见部署第 7 步）。旧部署写在 `config.json` 的同名字段仍兼容，且优先级高于环境变量。
 
 ### 管理后台钉钉登录
 
