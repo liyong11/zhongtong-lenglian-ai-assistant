@@ -7,7 +7,7 @@
  *  B. 钉钉客户端内免登：前端 dd.runtime.permission.requestAuthCode 拿 authCode → getUserByAuthCode
  *     （topapi：gettoken → v2/user/getuserinfo → v2/user/get）
  *
- * 凭据由调用方按次传入（本项目存 config.json，非环境变量）；access_token 按 appKey 缓存。
+ * 凭据由调用方按次传入（本项目从 .env 的 DINGTALK_* 读取，config.json 同名字段优先）；access_token 按 appKey 缓存。
  */
 let tokenCache = { key: '', token: null, expires: 0 };
 

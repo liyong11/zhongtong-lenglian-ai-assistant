@@ -13,8 +13,6 @@ services:
     environment:
       PORT: 8787
       DATA_DIR: /data
-      ADMIN_PORT: ${ADMIN_PORT:-8788}
-      ADMIN_BIND: 0.0.0.0
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-}
       CHAT_RATE_LIMIT: ${CHAT_RATE_LIMIT:-30}
       SSE_MAX_CONCURRENT: ${SSE_MAX_CONCURRENT:-100}
@@ -24,7 +22,6 @@ services:
       DINGTALK_CORP_ID: ${DINGTALK_CORP_ID:-}
     ports:
       - "${APP_BIND:-0.0.0.0}:${APP_PORT:-8787}:8787"
-      - "${ADMIN_HOST_BIND:-127.0.0.1}:${ADMIN_PORT:-8788}:${ADMIN_PORT:-8788}"
     volumes:
       - ./data:/data
     logging:

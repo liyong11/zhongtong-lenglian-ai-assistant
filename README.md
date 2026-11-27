@@ -24,29 +24,29 @@ pnpm start          # 启动代理，默认端口 8787（PORT 环境变量可覆
 
 开发模式：`pnpm dev`（Vite 5173，`/api` 自动代理到 8787，需同时跑 `pnpm dev:server`）。
 
-## 部署（Docker）
+## 部署（Docker，单端口）
 
-双端口部署：公共端口 `8787` 只服务气泡、对话和嵌入脚本；管理端口 `8788` 只服务 `/admin` 后台。管理端口默认不对外，给内网用时改绑定地址并限制防火墙。服务器只要 Docker。
+一个 app 容器监听 `8787`，前面用 HTTPS 反向代理（公司 nginx/网关，或 nginx + certbot）。气泡和后台 `/admin` 同域：后台只对通过钉钉登录且被勾选为管理员的人开放。
 
 ```
-用户/公网 → app:8787（气泡、对话、embed.js）
-内网      → app:8788（/admin 后台）
-两者共用 /data（配置、会话、上传文件）
+用户 → 443 HTTPS 反代 → app:8787（气泡、/admin、embed.js）→ /data
 ```
 
-> 以后要挂到 HTTPS 域名后面，见文末「可选：放到 HTTPS 后面」。
+> 钉钉扫码回调要求生产环境使用 HTTPS 域名，不能是 IP 或纯 HTTP。没有 HTTPS 域名时，只能先用 `ADMIN_TOKEN` 过渡，钉钉登录配不了。
 
 ### 0. 准备清单
 
 - 一台 Linux 服务器（Ubuntu 22.04/24.04，2 核 4G 起），能 SSH 登录
-- 安全组/防火墙放行 `22`、`8787`；`8788` 只对內网开放，**不要对公网放行**
+- 一个域名，DNS A 记录指向服务器，且能上 HTTPS
+- 钉钉企业内部应用的 `AppKey` / `AppSecret` / 企业 `CorpId`
 - 百炼 `apiKey`，以及智能体应用 `appId`（或模型名 `model`）
-- 钉钉应用凭据（可选；分端口部署不要启用钉钉登录，后台用 `ADMIN_TOKEN`，见第 7 步）
+- 安全组/防火墙放行 `22`、`80`、`443`；`8787` 只给本机反代，不对公网放行
 
-下面命令默认以 `root` 执行；用普通用户时自行加 `sudo`。先设部署目录：
+下面命令默认以 `root` 执行；用普通用户时自行加 `sudo`。先设两个变量：
 
 ```bash
 export APP_DIR=/opt/ai-assistant
+export DOMAIN=ai.example.com        # 换成你的域名
 ```
 
 ### 1. 安装 Docker
@@ -71,36 +71,38 @@ cd "$APP_DIR"
 
 目录已存在时改成 `cd "$APP_DIR" && git pull`。
 
-### 3. 配置端口和后台口令
+### 3. 配置 .env
 
 ```bash
 cp .env.example .env
 vi .env
 ```
 
-最少确认这几项：
+按实际填写：
 
 ```dotenv
-APP_PORT=8787            # 公共端口：气泡、对话、嵌入脚本
-APP_BIND=0.0.0.0         # 公共端口直接对外；只让本机反代时改 127.0.0.1
-ADMIN_PORT=8788          # 管理端口：只服务 /admin
-ADMIN_HOST_BIND=127.0.0.1 # 默认仅本机（SSH 隧道访问）；内网直连改内网网卡 IP 或 0.0.0.0
-ADMIN_TOKEN=换成一串随机字符
+APP_PORT=8787
+APP_BIND=127.0.0.1                 # 只给本机反代；直接 HTTP 调试时可临时 0.0.0.0
+PUBLIC_ORIGIN=https://ai.example.com
+
+# 过渡用：钉钉还没配好时用令牌进后台；钉钉生效后留空
+ADMIN_TOKEN=
+
+DINGTALK_APP_KEY=dingxxxx
+DINGTALK_APP_SECRET=xxxx
+DINGTALK_CORP_ID=dingxxxx
 ```
 
-- 公共端口访问 `/admin`、`/api/admin/*`、`/api/auth/*` 会直接 404，只有 `8788` 能进后台。
-- `ADMIN_HOST_BIND` 控制宿主机把管理端口开到哪：`127.0.0.1` 仅本机，内网访问填内网网卡 IP 或 `0.0.0.0` 并配合安全组。
-- `ADMIN_TOKEN` 是 `/admin` 的后台口令，自己编，不是系统生成；`openssl rand -hex 24` 可生成。**分端口模式下必填，未设置会拒绝启动**。
-- 钉钉凭据也在 `.env` 里填（`DINGTALK_APP_KEY` / `DINGTALK_APP_SECRET` / `DINGTALK_CORP_ID`），见第 7 步。
-- HTTP 下令牌是明文传输，内网可以接受；公网管理不建议。
+- `PUBLIC_ORIGIN` 必须是最终 HTTPS 地址，钉钉回调按它生成。
+- `ADMIN_TOKEN` 只在钉钉配好之前过渡用。**钉钉生效后留空即可，不需要 token**。
+- 如果钉钉和 token 都为空，后台是开放状态，只允许本机/临时调试，公网不能这样跑。
+- `APP_BIND=127.0.0.1` 时只能通过反代访问；先本机验证没问题再开 HTTPS。
 
 ```bash
 chmod 600 .env
 ```
 
 ### 4. 首次配置
-
-先建数据目录，再把示例配置复制成正式配置：
 
 ```bash
 mkdir -p data
@@ -122,7 +124,7 @@ vi data/config.json
 ```
 
 - `appId` 与 `model` 二选一：用百炼智能体应用就填 `appId`、`model` 留空；直调模型就 `appId` 留空、`model` 填如 `qwen-plus`。
-- 钉钉凭据不写进 `config.json`，全部放 `.env`（见第 7 步）。
+- 钉钉凭据不写进 `config.json`，全部放 `.env`。
 - 检查 JSON 合法性：`python3 -m json.tool data/config.json >/dev/null && echo OK`。
 
 关键一步：容器内进程 uid 是 `1000`，数据目录必须让它可写：
@@ -149,9 +151,7 @@ docker compose logs -f app           # Ctrl+C 退出日志
 
 容器时区已固定为 `Asia/Shanghai`，值班日期不会因为服务器时区跑偏。
 
-### 6. 验证
-
-服务器本机：
+### 6. 本机验证
 
 ```bash
 curl -fsS http://127.0.0.1:8787/api/ping
@@ -163,15 +163,9 @@ curl -fsS http://127.0.0.1:8787/api/ping
 ```bash
 curl -fsS http://127.0.0.1:8787/embed.js | head -3   # 应输出嵌入脚本
 curl -fsSI http://127.0.0.1:8787/ | head -1          # 应返回 200
-curl -fsSI http://127.0.0.1:8788/admin | head -1     # 应返回 200
-curl -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8787/admin  # 应为 404
+curl -fsSI http://127.0.0.1:8787/admin | head -1     # 应返回 200
+curl -fsS http://127.0.0.1:8787/api/auth/me          # dingtalkConfigured 应为 true
 ```
-
-浏览器打开：
-
-- 气泡：`http://<服务器IP>:8787/`
-- 后台：`http://<内网IP>:8788/admin`
-- 管理端口只绑了 `127.0.0.1` 时，用 SSH 隧道：`ssh -L 8788:127.0.0.1:8788 root@<服务器IP>`，再开 `http://127.0.0.1:8788/admin`
 
 再实测一次流式：
 
@@ -183,59 +177,111 @@ curl -N -X POST http://127.0.0.1:8787/api/chat/stream \
 
 应先出现 `event: ready`，随后陆续输出 `data:` 片段。
 
-### 7. 钉钉登录（可选）
+### 7. HTTPS 反向代理（钉钉登录必需）
 
-⚠️ 分端口模式下后台在 `8788`，而钉钉回调固定走公共域名 `8787`，公共端口又屏蔽了 `/api/auth/*`，所以**分端口部署不要启用钉钉登录**，后台用 `ADMIN_TOKEN`。确实要用钉钉，只能把 `ADMIN_PORT` 留空走单端口模式（后台与气泡同端口，不建议公网）。
+服务器没有现成 nginx/网关时：
 
-以下步骤仅适用于单端口 + 公网 HTTPS；纯 HTTP/IP 也用不了钉钉扫码。
+```bash
+apt install -y nginx certbot python3-certbot-nginx
+```
 
-1. 钉钉开放平台创建企业内部应用，记下 `AppKey`、`AppSecret`、企业 `CorpId`，填进 `.env`：
-   ```dotenv
-   DINGTALK_APP_KEY=dingxxxx
-   DINGTALK_APP_SECRET=xxxx
-   DINGTALK_CORP_ID=dingxxxx
-   ```
-   （`config.json` 里对应字段留空即可；两边都填时以 `config.json` 为准。）
-2. 「登录与分享」→ 授权回调地址填：`https://你的域名/api/auth/dingtalk/callback`
-3. 「安全设置」→ 服务器出口 IP：填服务器公网出口 IP，容器走宿主机 NAT，所以填宿主机的：
+新建 `/etc/nginx/sites-available/ai-assistant.conf`：
+
+```nginx
+server {
+    listen 80;
+    server_name ai.example.com;
+    client_max_body_size 10m;
+
+    # SSE 流式对话：关缓冲、拉长读超时
+    location = /api/chat/stream {
+        proxy_pass http://127.0.0.1:8787;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header Connection "";
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 300s;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:8787;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_read_timeout 120s;
+    }
+}
+```
+
+```bash
+ln -s /etc/nginx/sites-available/ai-assistant.conf /etc/nginx/sites-enabled/
+nginx -t && systemctl reload nginx
+
+# DNS 指到本机后再签证书
+certbot --nginx -d "$DOMAIN" --redirect
+```
+
+公司已有 HTTPS 网关时，把同样两条 location 规则搬过去即可；关键是 `/api/chat/stream` 必须 `proxy_buffering off`、`proxy_read_timeout 300s`，并透传 `X-Forwarded-Host` / `X-Forwarded-Proto`。
+
+验证：
+
+```bash
+curl -fsS "https://$DOMAIN/api/ping"
+curl -fsSI "https://$DOMAIN/admin" | head -1
+```
+
+### 8. 钉钉登录
+
+1. 钉钉开放平台创建企业内部应用，拿到 `AppKey`、`AppSecret`、企业 `CorpId`，填进 `.env` 的 `DINGTALK_APP_KEY` / `DINGTALK_APP_SECRET` / `DINGTALK_CORP_ID`。
+2. 「登录与分享」→ 授权回调地址填：`https://$DOMAIN/api/auth/dingtalk/callback`，必须与 `PUBLIC_ORIGIN` 完全一致。
+3. 「安全设置」→ 服务器出口 IP：填服务器公网出口 IP（容器走宿主机 NAT）：
    ```bash
    curl -s ifconfig.me
    ```
    不填会报 `60020 访问ip不在白名单之中`。
 4. 开通通讯录读取相关权限并发布应用版本，否则扫码后拿不到用户信息。
-5. `.env` 里设置 `PUBLIC_ORIGIN=https://你的域名`，再 `docker compose up -d` 让环境变量生效。
+5. 让配置生效：`docker compose up -d`。
+6. 打开 `https://$DOMAIN/admin`，用钉钉扫码登录。第一次登录后立刻到「人员设置」勾选管理员并保存。
 
-回调地址由 `PUBLIC_ORIGIN` 固定，必须和开放平台登记的一字不差。
+⚠️ 钉钉已配但「人员设置」里一个管理员都没勾选时，**企业内所有登录用户都能进后台**（用于首次引导）。上线前必须完成管理员勾选，或者先在 `data/config.json` 的 `adminUsers` 里填好管理员钉钉 userId。
 
-### 8. 后台初始化
+确认钉钉登录正常后，把 `.env` 里的 `ADMIN_TOKEN` 留空，再 `docker compose up -d`。之后后台只认钉钉登录，不再需要 token。
 
-打开 `http://<内网IP>:8788/admin`（管理端口只绑 127.0.0.1 时走 SSH 隧道）：
+### 9. 后台初始化
 
-- 没配钉钉时输入 `.env` 里的 `ADMIN_TOKEN`。
-- 第一次登录后立刻到「人员设置」勾选管理员并保存（一个管理员都没勾选时全员可登录，属首次引导逻辑）。
+打开 `https://$DOMAIN/admin`：
+
+- 钉钉登录生效时直接扫码；未配钉钉时输入 `ADMIN_TOKEN`。
+- 第一次登录后立刻到「人员设置」勾选管理员并保存。
 - 依次配置：机器人形象（名称/头像）、值班表、下载汇总、常见问题、人员。
 - 需要限制嵌入站点时填「允许嵌入域名」；需要口令时设「嵌入口令」。
 
 所有后台修改都写进 `data/` 目录，重启/重新构建不丢。
 
-### 9. 嵌入第三方页面
+### 10. 嵌入第三方页面
 
 在对方页面 `</body>` 前：
 
 ```html
-<script src="http://<服务器IP>:8787/embed.js" data-title="小冷"></script>
+<script src="https://ai.example.com/embed.js" data-title="小冷"></script>
 ```
 
 设了嵌入口令则用 `.../embed.js?token=口令`。对方站点有 CSP 时放行：
 
 ```text
-script-src http://<服务器IP>:8787
-frame-src http://<服务器IP>:8787
+script-src https://ai.example.com
+frame-src https://ai.example.com
 ```
 
-⚠️ **对方页面是 HTTPS 时，浏览器会拦截 HTTP 的脚本和 iframe（混合内容）**。这种场景必须给本服务套一层 HTTPS 反代，见下一节。
+HTTPS 页面只能嵌入 HTTPS 地址，所以本服务必须走上面的 HTTPS 反代。
 
-### 10. 日常更新与回滚
+### 11. 日常更新与回滚
 
 ```bash
 cd /opt/ai-assistant
@@ -246,7 +292,7 @@ tar czf "backup-$(date +%F-%H%M).tgz" data .env
 git pull
 docker compose up -d --build
 docker compose ps
-curl -fsS http://127.0.0.1:8787/api/ping
+curl -fsS "https://$(grep '^PUBLIC_ORIGIN=' .env | cut -d/ -f3)/api/ping"
 ```
 
 回滚到上一个提交：
@@ -259,7 +305,7 @@ docker compose up -d --build
 
 `data/` 不在 git 里，更新和回滚都不会动配置。旧镜像可清理：`docker image prune -f`。
 
-### 11. 备份、恢复、迁移
+### 12. 备份、恢复、迁移
 
 备份（配置里有 API Key，注意保管）：
 
@@ -280,25 +326,24 @@ chown -R 1000:1000 data
 docker compose up -d
 ```
 
-### 12. 故障排查
+迁移后更新钉钉回调地址、服务器出口 IP、DNS。
+
+### 13. 故障排查
 
 | 现象 | 原因与处理 |
 | --- | --- |
-| 浏览器打不开 `IP:8787` | 安全组/防火墙没放行 8787；`ss -lntp \| grep 8787` 看端口；`docker compose ps` 看容器 |
-| 公共端口打开 `/admin` 是 404 | 正常：后台只在 `8788`，公共端口故意屏蔽 |
-| 内网打不开 `IP:8788/admin` | `ADMIN_HOST_BIND` 还是 `127.0.0.1`；改成内网网卡 IP 或 `0.0.0.0`，并确认防火墙放行内网访问 |
-| 8788 被占用 | `.env` 改 `ADMIN_PORT`，例如 `8790`，再 `docker compose up -d` |
-| 8788 能从公网打开 | 立即改 `ADMIN_HOST_BIND` 或安全组，管理端口只应走内网 |
+| 浏览器打不开域名 | DNS 没指向本机、80/443 没放行、反代没起；先 `dig +short 域名` 和 `nginx -t` |
+| 访问 502 | `docker compose ps` 看 app 是否 healthy，`docker compose logs --tail 100 app` |
 | `docker compose up` 拉镜像超时 | 默认已用 DaoCloud 国内镜像；仍失败时在 `.env` 改 `NODE_IMAGE`，或配 Docker 镜像加速 |
 | app 起不来，日志 `EACCES /data` | `chown -R 1000:1000 data` 后 `docker compose restart app` |
 | `/api/ping` 的 `configured` 为 false | `data/config.json` 没填 `apiKey` 或没填 `appId`/`model`；改完 `docker compose restart app` |
-| 后台没让输令牌就进去了 | 只发生在单端口模式且 `ADMIN_TOKEN` 为空、未配钉钉。分端口模式未设令牌会直接拒绝启动 |
-| HTTPS 页面里气泡/脚本被浏览器拦截 | 混合内容限制，给本服务加 HTTPS 反代（下一节） |
-| 钉钉报 redirect_uri 错误 | 钉钉登录必须 HTTPS；`PUBLIC_ORIGIN`、回调地址、域名三者一致 |
+| 后台没让登录就进去了 | `ADMIN_TOKEN` 为空且钉钉没配置成功；先配钉钉或临时设 token，别把后台裸奔在公网 |
+| 扫码报 redirect_uri 错误 | 回调地址必须 HTTPS 且与 `PUBLIC_ORIGIN`、开放平台登记三者完全一致 |
 | 钉钉报 `60020` | 钉钉后台「服务器出口 IP」没加宿主机公网 IP |
-| 回答不逐字输出 | 直连容器一般不会；如果前面加了 nginx，确认 SSE location 关闭了 `proxy_buffering` |
+| 扫码后没有任何反应 | 检查 `DINGTALK_CORP_ID`、应用权限、应用是否已发布 |
+| 回答不逐字输出 | 反代少了 `proxy_buffering off` 或 `proxy_read_timeout 300s` |
 | 上传头像失败 | `data/uploads` 权限不对，`chown -R 1000:1000 data` |
-| 8787 被占用 | `.env` 里改 `APP_PORT`，例如 `APP_PORT=8790`，再 `docker compose up -d` |
+| 8787 被占用 | `.env` 改 `APP_PORT`，例如 `8790`，再 `docker compose up -d` |
 | 配置改坏了 | 服务器会留 `data/config.json.corrupt-时间戳`；从备份恢复或重填 |
 
 常用命令：
@@ -310,36 +355,6 @@ docker compose restart app
 docker compose down            # 停止（data 不受影响）
 docker compose up -d           # 再启动
 ```
-
-### 13. 可选：放到 HTTPS 后面
-
-公司已有 nginx/网关时：
-
-1. `.env` 改 `APP_BIND=127.0.0.1`（8787 不再对外），设 `PUBLIC_ORIGIN=https://你的域名`，`docker compose up -d`。
-2. 反向代理到 `http://127.0.0.1:8787`，SSE 路径 `/api/chat/stream` 要关缓冲：
-
-   ```nginx
-   location = /api/chat/stream {
-       proxy_pass http://127.0.0.1:8787;
-       proxy_http_version 1.1;
-       proxy_set_header Host $host;
-       proxy_set_header X-Forwarded-Host $host;
-       proxy_set_header X-Forwarded-Proto $scheme;
-       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-       proxy_buffering off;
-       proxy_cache off;
-       proxy_read_timeout 300s;
-   }
-   location / {
-       proxy_pass http://127.0.0.1:8787;
-       proxy_set_header Host $host;
-       proxy_set_header X-Forwarded-Host $host;
-       proxy_set_header X-Forwarded-Proto $scheme;
-   }
-   ```
-
-3. 嵌入地址、`PUBLIC_ORIGIN` 改用 HTTPS 域名。
-4. 只反代 `8787`；后台仍在 `8788` 内网端口，不要一起反代到公网。
 
 ### 14. 不想用 Docker
 
@@ -367,7 +382,7 @@ docker compose up -d           # 再启动
 
 - **PC 浏览器**：后台展示「使用钉钉登录」→ 跳转钉钉扫码 → 回调 `GET /api/auth/dingtalk/callback` 换取用户信息 → 写入会话（`sessions.json`，7 天有效，重启不掉登录）
 - **钉钉客户端内**：自动加载钉钉 JSAPI 免登（`POST /api/auth/dingtalk/auto`），无需扫码
-- 鉴权优先级：`X-Admin-Token` 请求头与登录会话任一通过即可；**配置了钉钉凭据后后台强制登录**。单端口模式下两者都未配置时维持旧的本地开放行为；**分端口模式启动时强制要求 `ADMIN_TOKEN`**
+- 鉴权优先级：`X-Admin-Token` 请求头与登录会话任一通过即可；**配置了钉钉凭据后后台强制登录**。钉钉和 token 都未配置时后台开放，仅限本机/临时调试
 - 退出登录：后台侧栏底部「退出」，调 `POST /api/auth/logout`
 
 **上线前必须在钉钉开放平台登记回调地址**（应用开发 → 登录与分享 → 授权回调地址）：
@@ -386,12 +401,10 @@ https://你的域名/api/auth/dingtalk/callback
 
 | 变量 | 默认 | 说明 |
 | --- | --- | --- |
-| `PORT` | `8787` | 公共端口：气泡、对话、嵌入脚本 |
-| `ADMIN_PORT` | 空 | 管理端口；设置后公共端口屏蔽后台页面与后台接口，且必须配 `ADMIN_TOKEN` |
-| `ADMIN_BIND` | `127.0.0.1` | 管理端口监听地址；compose 内固定 `0.0.0.0`，由宿主 `ADMIN_HOST_BIND` 控制暴露范围 |
-| `ADMIN_TOKEN` | 空 | 管理后台令牌；分端口部署必填，未设置会拒绝启动 |
+| `PORT` | `8787` | 服务端口：气泡、后台、嵌入脚本 |
+| `ADMIN_TOKEN` | 空 | 过渡用后台令牌；钉钉配好后不需要。钉钉和 token 都为空时后台开放，仅限本机/调试 |
 | `DATA_DIR` | `server.js` 所在目录 | 运行时数据目录（config/sidebar/sessions/uploads）；Docker 固定 `/data` |
-| `PUBLIC_ORIGIN` | 空 | 钉钉回调使用的固定地址，如 `https://ai.example.com` |
+| `PUBLIC_ORIGIN` | 空 | 钉钉回调使用的固定 HTTPS 地址，如 `https://ai.example.com` |
 | `DINGTALK_APP_KEY` / `DINGTALK_APP_SECRET` / `DINGTALK_CORP_ID` | 空 | 钉钉凭据；`config.json` 对应字段非空时以 `config.json` 为准 |
 | `CHAT_RATE_LIMIT` | `30` | 对话接口每 IP 每分钟请求上限，`0` 关闭 |
 | `SSE_MAX_CONCURRENT` | `50` | 全局 SSE 流并发上限，超出返回 429「咨询人数较多」；2核4G 机器可调到 50~100 |

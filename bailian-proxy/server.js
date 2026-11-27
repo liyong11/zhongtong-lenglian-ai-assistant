@@ -1088,10 +1088,10 @@ async function handleRequest(req, res) {
 
 const server = http.createServer(handleRequest);
 
-if (ADMIN_ENABLED && !ADMIN_TOKEN) {
+if (ADMIN_ENABLED && !ADMIN_TOKEN && !dingtalkReady(loadConfig())) {
   console.error('');
-  console.error('  [启动失败] 已开启管理端口（ADMIN_PORT），但未设置 ADMIN_TOKEN。');
-  console.error('  分端口模式下管理端口不接受钉钉登录，请先在 .env 设置 ADMIN_TOKEN 再启动。');
+  console.error('  [启动失败] 已开启管理端口（ADMIN_PORT），但没有 ADMIN_TOKEN 或钉钉凭据。');
+  console.error('  请至少配置一种后台鉴权后再启动。');
   console.error('');
   process.exit(1);
 }
